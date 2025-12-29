@@ -1,0 +1,21 @@
+{
+  "name": "claude-code-explained",
+  "version": "0.1.0",
+  "description": "Interactive visualization for Claude Code execution traces",
+  "main": "view.js",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "start": "node view.js",
+    "build": "node build.js"
+  },
+  "keywords": [
+    "claude",
+    "visualization",
+    "llm"
+  ],
+  "author": "Yi-Chang Chen",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.0"
+  }
+}
