@@ -37,9 +37,9 @@ function parseLLMFile(filePath) {
   // Determine type (request or response)
   const type = filename.toLowerCase().includes('request') ? 'request' : 'response';
 
-  // Extract endpoint from filename
+  // Extract endpoint from filename and convert to path format
   const endpointMatch = filename.match(/api\.anthropic\.com_(.+)\.txt$/);
-  const endpoint = endpointMatch ? endpointMatch[1] : 'unknown';
+  const endpoint = endpointMatch ? '/' + endpointMatch[1].replace(/_/g, '/') : 'unknown';
 
   // Parse HTTP headers and body
   const lines = content.split('\n');
@@ -119,7 +119,7 @@ function getCSS() {
       background: #1e1e1e;
       color: #d4d4d4;
     }
-    .container { max-width: 1200px; margin: 0 auto; }
+    .container { max-width: 1400px; margin: 0 auto; }
     h1 {
       color: #4ec9b0;
       border-bottom: 2px solid #4ec9b0;
@@ -170,6 +170,73 @@ function getCSS() {
       overflow: auto;
     }
     .detail.show { display: block; }
+
+    /* Split view layout */
+    .split-view {
+      display: flex;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .blocks-panel {
+      flex: 1;
+      min-width: 0;
+    }
+    .detail-panel {
+      flex: 1;
+      background: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 4px;
+      padding: 15px;
+      position: sticky;
+      top: 20px;
+      max-height: calc(100vh - 40px);
+      overflow: auto;
+    }
+    .detail-panel h3 {
+      margin-top: 0;
+      color: #4ec9b0;
+    }
+
+    /* Block visualization */
+    .blocks-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .block {
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.9em;
+      border: 2px solid transparent;
+    }
+    .block:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .block.selected {
+      border-color: #fff;
+      box-shadow: 0 0 10px rgba(255,255,255,0.3);
+    }
+    .block.system {
+      background: #7c3aed;
+      color: #fff;
+    }
+    .block.tool {
+      background: #f59e0b;
+      color: #000;
+    }
+    .block.user {
+      background: #3b82f6;
+      color: #fff;
+    }
+    .block.assistant {
+      background: #10b981;
+      color: #fff;
+    }
+
     pre {
       margin: 0;
       white-space: pre-wrap;
@@ -227,8 +294,118 @@ function getClientJS() {
       }
     }
 
+    let currentSelectedBlock = null;
+    let blockDataStore = {};
+
+    // Simple hash function
+    function simpleHash(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      return Math.abs(hash).toString(36).substring(0, 6);
+    }
+
+    function showBlockDetail(exampleId, blockId) {
+      const detailPanel = document.getElementById('detail-panel-' + exampleId);
+      const blockData = blockDataStore[exampleId + '-' + blockId];
+
+      if (!blockData) return;
+
+      const hash = simpleHash(JSON.stringify(blockData.content));
+
+      // Update selected state
+      const allBlocks = document.querySelectorAll('.block');
+      allBlocks.forEach(b => b.classList.remove('selected'));
+      const blockElement = document.getElementById('block-' + exampleId + '-' + blockId);
+      if (blockElement) {
+        blockElement.classList.add('selected');
+      }
+
+      // Show detail panel
+      detailPanel.innerHTML = '<h3>' + blockData.type + '-' + hash + '</h3><pre>' + JSON.stringify(blockData.content, null, 2) + '</pre>';
+    }
+
+    function renderBlocks(exampleId, trace, traceIdx) {
+      let html = '';
+      let blockIdx = 0;
+
+      if (trace.type === 'request') {
+        // First render system blocks if exists
+        if (trace.data.system) {
+          const systemData = trace.data.system;
+
+          // Check if system is an array or a single item
+          const systemItems = Array.isArray(systemData) ? systemData : [systemData];
+
+          systemItems.forEach(item => {
+            const hash = simpleHash(JSON.stringify(item));
+            const blockId = 'trace' + traceIdx + '-block' + blockIdx;
+
+            blockDataStore[exampleId + '-' + blockId] = {
+              type: 'system',
+              content: item
+            };
+
+            html += '<div id="block-' + exampleId + '-' + blockId + '" class="block system" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+            html += 'system-' + hash;
+            html += '</div>';
+            blockIdx++;
+          });
+        }
+
+        // Then render each tool as a separate block
+        if (trace.data.tools && trace.data.tools.length > 0) {
+          trace.data.tools.forEach(tool => {
+            const toolName = tool.name || 'unknown';
+            const blockId = 'trace' + traceIdx + '-block' + blockIdx;
+
+            blockDataStore[exampleId + '-' + blockId] = {
+              type: 'tool',
+              content: tool
+            };
+
+            html += '<div id="block-' + exampleId + '-' + blockId + '" class="block tool" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+            html += 'tool-' + toolName;
+            html += '</div>';
+            blockIdx++;
+          });
+        }
+
+        // Finally render messages in their original order (user and assistant alternating)
+        if (trace.data.messages) {
+          trace.data.messages.forEach((msg) => {
+            const role = msg.role || 'unknown';
+            const hash = simpleHash(JSON.stringify(msg));
+            const blockId = 'trace' + traceIdx + '-block' + blockIdx;
+
+            blockDataStore[exampleId + '-' + blockId] = {
+              type: role,
+              content: msg
+            };
+
+            html += '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + role + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+            html += role + '-' + hash;
+            html += '</div>';
+            blockIdx++;
+          });
+        }
+      }
+
+      return html;
+    }
+
     function renderExampleDetail(exampleId, data) {
       const detailDiv = document.getElementById('example-detail-' + exampleId);
+
+      // Clear old block data for this example
+      Object.keys(blockDataStore).forEach(key => {
+        if (key.startsWith(exampleId + '-')) {
+          delete blockDataStore[key];
+        }
+      });
 
       const stats = {
         totalTraces: data.llmTraces.length,
@@ -243,19 +420,45 @@ function getClientJS() {
       html += '<div class="stat-item">回應數: ' + stats.responses + '</div>';
       html += '</div>';
 
+      html += '<div class="split-view">';
+      html += '<div class="blocks-panel">';
       html += '<div class="timeline">';
+
       data.llmTraces.forEach((trace, idx) => {
         const eventClass = trace.type === 'response' ? 'event response' : 'event';
-        html += '<div class="' + eventClass + '" onclick="toggleDetail(\\'' + exampleId + '-' + idx + '\\')">';
+        const metaInfo = trace.type === 'request' && trace.data.model
+          ? trace.data.model + ' | ' + trace.endpoint
+          : trace.endpoint;
+        html += '<div class="' + eventClass + '">';
         html += '<div class="event-header">';
         html += '<span class="event-title">[' + trace.timestamp + '] ' + trace.type.toUpperCase() + '</span>';
-        html += '<span class="event-meta">' + trace.endpoint + '</span>';
+        html += '<span class="event-meta">' + metaInfo + '</span>';
         html += '</div>';
-        html += '<div id="detail-' + exampleId + '-' + idx + '" class="detail">';
-        html += '<pre>' + JSON.stringify(trace.data, null, 2) + '</pre>';
-        html += '</div>';
+
+        // Render blocks for requests
+        if (trace.type === 'request') {
+          html += '<div class="blocks-container">';
+          html += renderBlocks(exampleId, trace, idx);
+          html += '</div>';
+        } else {
+          // For responses, show raw JSON on click
+          html += '<div onclick="toggleDetail(\\'' + exampleId + '-' + idx + '\\')" style="cursor: pointer; margin-top: 10px; color: #858585;">';
+          html += '點擊查看回應詳情 ▼';
+          html += '</div>';
+          html += '<div id="detail-' + exampleId + '-' + idx + '" class="detail">';
+          html += '<pre>' + JSON.stringify(trace.data, null, 2) + '</pre>';
+          html += '</div>';
+        }
+
         html += '</div>';
       });
+
+      html += '</div>';
+      html += '</div>';
+      html += '<div id="detail-panel-' + exampleId + '" class="detail-panel">';
+      html += '<h3>選擇一個 block 查看詳情</h3>';
+      html += '<p style="color: #858585;">點擊左側的 block 以查看詳細內容</p>';
+      html += '</div>';
       html += '</div>';
 
       detailDiv.innerHTML = html;
