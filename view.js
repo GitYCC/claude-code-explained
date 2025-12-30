@@ -24,6 +24,26 @@ function scanExamples() {
 }
 
 /**
+ * Recursively remove unwanted fields from an object or array
+ */
+function removeUnwantedFields(obj) {
+  const unwantedFields = ['signature', 'cache_control'];
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUnwantedFields(item));
+  } else if (obj !== null && typeof obj === 'object') {
+    const cleaned = {};
+    for (const key in obj) {
+      if (!unwantedFields.includes(key)) {
+        cleaned[key] = removeUnwantedFields(obj[key]);
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
+/**
  * Parse a single LLM trace file (Request or Response)
  */
 function parseLLMFile(filePath) {
@@ -50,6 +70,9 @@ function parseLLMFile(filePath) {
     const bodyContent = lines.slice(bodyStartIndex + 1).join('\n');
     try {
       data = JSON.parse(bodyContent);
+
+      // Remove unwanted fields from all data
+      data = removeUnwantedFields(data);
 
       // For requests, only keep important fields
       if (type === 'request') {
@@ -119,7 +142,7 @@ function getCSS() {
       background: #1e1e1e;
       color: #d4d4d4;
     }
-    .container { max-width: 1400px; margin: 0 auto; }
+    .container { max-width: 1800px; margin: 0 auto; }
     h1 {
       color: #4ec9b0;
       border-bottom: 2px solid #4ec9b0;
@@ -150,7 +173,7 @@ function getCSS() {
     .event-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
     }
     .event-title {
       font-weight: bold;
@@ -178,11 +201,11 @@ function getCSS() {
       margin-top: 20px;
     }
     .blocks-panel {
-      flex: 1;
+      flex: 2;
       min-width: 0;
     }
     .detail-panel {
-      flex: 1;
+      flex: 3;
       background: #252526;
       border: 1px solid #3e3e42;
       border-radius: 4px;
@@ -197,14 +220,44 @@ function getCSS() {
       color: #4ec9b0;
     }
 
+    /* JSON Viewer custom styles */
+    andypf-json-viewer {
+      font-size: 13px;
+      line-height: 1.6;
+      align-items: flex-start !important;
+    }
+
+    /* Try to apply white-space to string values - Method 1: Global CSS */
+    andypf-json-viewer * {
+      white-space: pre-wrap !important;
+      align-items: flex-start !important;
+    }
+
+    /* Try to pierce Shadow DOM - Method 2: CSS parts */
+    andypf-json-viewer::part(string-value) {
+      white-space: pre-wrap;
+    }
+
+    /* Additional attempts for different possible selectors */
+    andypf-json-viewer::part(value) {
+      white-space: pre-wrap;
+    }
+
+    andypf-json-viewer::part(string) {
+      white-space: pre-wrap;
+    }
+
     /* Block visualization */
     .blocks-container {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
       margin-top: 15px;
+      align-items: flex-start;
     }
     .block {
+      display: flex;
+      align-items: flex-start;
       padding: 10px 15px;
       border-radius: 4px;
       cursor: pointer;
@@ -234,6 +287,14 @@ function getCSS() {
     }
     .block.assistant {
       background: #10b981;
+      color: #fff;
+    }
+    .block.tool_use {
+      background: #ec4899;
+      color: #fff;
+    }
+    .block.tool_result {
+      background: #8b5cf6;
       color: #fff;
     }
 
@@ -308,13 +369,71 @@ function getClientJS() {
       return Math.abs(hash).toString(36).substring(0, 6);
     }
 
+    function formatBlockType(type) {
+      const typeMap = {
+        'system': 'System',
+        'tool': 'Tool',
+        'user': 'User',
+        'assistant': 'Assistant',
+        'tool_use': 'ToolUse',
+        'tool_result': 'ToolResult'
+      };
+      return typeMap[type] || type;
+    }
+
+    function renderDetailContent(content) {
+      const viewerId = 'json-viewer-' + Math.random().toString(36).substr(2, 9);
+      const html = '<div id="' + viewerId + '" style="margin-top: 10px;"></div>';
+
+      setTimeout(() => {
+        const container = document.getElementById(viewerId);
+        if (container) {
+          const viewer = document.createElement('andypf-json-viewer');
+          viewer.data = content;
+          viewer.expanded = true;
+          viewer.indent = 2;
+          viewer.theme = 'monokai';
+          viewer.showDataTypes = true;
+          viewer.showToolbar = false;
+          viewer.expandIconType = 'arrow';
+          viewer.showCopy = false;
+          viewer.showSize = false;
+          container.appendChild(viewer);
+
+          // Try to inject CSS into Shadow DOM for newline handling and vertical alignment
+          setTimeout(() => {
+            if (viewer.shadowRoot) {
+              const style = document.createElement('style');
+              style.textContent = '.string-value, .value, span[class*=\\'string\\'] { white-space: pre-wrap !important; } .key-value, [class*=\\'key-value\\'], div, span { align-items: flex-start !important; }';
+              viewer.shadowRoot.appendChild(style);
+            }
+          }, 100);
+        }
+      }, 0);
+
+      return html;
+    }
+
     function showBlockDetail(exampleId, blockId) {
       const detailPanel = document.getElementById('detail-panel-' + exampleId);
       const blockData = blockDataStore[exampleId + '-' + blockId];
 
       if (!blockData) return;
 
-      const hash = simpleHash(JSON.stringify(blockData.content));
+      // Determine display ID based on block type
+      let displayId = '';
+      if (blockData.type === 'tool' && blockData.content.name) {
+        displayId = blockData.content.name;
+      } else if (blockData.type === 'tool_use' && blockData.content.id && blockData.content.id.startsWith('toolu_')) {
+        const idPart = blockData.content.id.substring(6);
+        displayId = idPart.substring(0, 4).toUpperCase();
+      } else if (blockData.type === 'tool_result' && blockData.content.tool_use_id && blockData.content.tool_use_id.startsWith('toolu_')) {
+        const idPart = blockData.content.tool_use_id.substring(6);
+        displayId = idPart.substring(0, 4).toUpperCase();
+      } else {
+        const hash = simpleHash(JSON.stringify(blockData.content));
+        displayId = hash.substring(0, 4).toUpperCase();
+      }
 
       // Update selected state
       const allBlocks = document.querySelectorAll('.block');
@@ -325,7 +444,7 @@ function getClientJS() {
       }
 
       // Show detail panel
-      detailPanel.innerHTML = '<h3>' + blockData.type + '-' + hash + '</h3><pre>' + JSON.stringify(blockData.content, null, 2) + '</pre>';
+      detailPanel.innerHTML = '<h3>' + formatBlockType(blockData.type) + '-' + displayId + '</h3>' + renderDetailContent(blockData.content);
     }
 
     function renderBlocks(exampleId, trace, traceIdx) {
@@ -342,6 +461,7 @@ function getClientJS() {
 
           systemItems.forEach(item => {
             const hash = simpleHash(JSON.stringify(item));
+            const displayId = hash.substring(0, 4).toUpperCase();
             const blockId = 'trace' + traceIdx + '-block' + blockIdx;
 
             blockDataStore[exampleId + '-' + blockId] = {
@@ -350,7 +470,7 @@ function getClientJS() {
             };
 
             html += '<div id="block-' + exampleId + '-' + blockId + '" class="block system" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
-            html += 'system-' + hash;
+            html += 'System-' + displayId;
             html += '</div>';
             blockIdx++;
           });
@@ -368,7 +488,7 @@ function getClientJS() {
             };
 
             html += '<div id="block-' + exampleId + '-' + blockId + '" class="block tool" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
-            html += 'tool-' + toolName;
+            html += 'Tool-' + toolName;
             html += '</div>';
             blockIdx++;
           });
@@ -378,18 +498,65 @@ function getClientJS() {
         if (trace.data.messages) {
           trace.data.messages.forEach((msg) => {
             const role = msg.role || 'unknown';
-            const hash = simpleHash(JSON.stringify(msg));
-            const blockId = 'trace' + traceIdx + '-block' + blockIdx;
 
-            blockDataStore[exampleId + '-' + blockId] = {
-              type: role,
-              content: msg
-            };
+            // Check if content is an array (multiple content blocks)
+            const isContentArray = Array.isArray(msg.content);
 
-            html += '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + role + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
-            html += role + '-' + hash;
-            html += '</div>';
-            blockIdx++;
+            if (isContentArray && msg.content.length > 0) {
+              // Split into multiple blocks, one for each content element
+              msg.content.forEach((contentItem, contentIdx) => {
+                const blockId = 'trace' + traceIdx + '-block' + blockIdx;
+
+                // Determine block type based on content item type
+                let blockType = role;
+                let displayId = '';
+
+                if (contentItem.type === 'tool_use') {
+                  blockType = 'tool_use';
+                  // Extract last 4 chars after 'toolu_' from id
+                  if (contentItem.id && contentItem.id.startsWith('toolu_')) {
+                    const idPart = contentItem.id.substring(6); // Remove 'toolu_'
+                    displayId = idPart.substring(0, 4).toUpperCase();
+                  }
+                } else if (contentItem.type === 'tool_result') {
+                  blockType = 'tool_result';
+                  // Extract last 4 chars after 'toolu_' from tool_use_id
+                  if (contentItem.tool_use_id && contentItem.tool_use_id.startsWith('toolu_')) {
+                    const idPart = contentItem.tool_use_id.substring(6); // Remove 'toolu_'
+                    displayId = idPart.substring(0, 4).toUpperCase();
+                  }
+                } else {
+                  // For other types, use first 4 chars of hash in uppercase
+                  const hash = simpleHash(JSON.stringify(contentItem));
+                  displayId = hash.substring(0, 4).toUpperCase();
+                }
+
+                blockDataStore[exampleId + '-' + blockId] = {
+                  type: blockType,
+                  content: contentItem
+                };
+
+                html += '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + blockType + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+                html += formatBlockType(blockType) + '-' + displayId;
+                html += '</div>';
+                blockIdx++;
+              });
+            } else {
+              // Single content block (string or single object)
+              const hash = simpleHash(JSON.stringify(msg));
+              const displayId = hash.substring(0, 4).toUpperCase();
+              const blockId = 'trace' + traceIdx + '-block' + blockIdx;
+
+              blockDataStore[exampleId + '-' + blockId] = {
+                type: role,
+                content: msg
+              };
+
+              html += '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + role + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+              html += formatBlockType(role) + '-' + displayId;
+              html += '</div>';
+              blockIdx++;
+            }
           });
         }
       }
@@ -488,6 +655,7 @@ function generateHTML(examples) {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>🔍 Claude Code Execution Viewer</title>
+      <script src="https://pfau-software.de/json-viewer/dist/iife/index.js"></script>
       <style>${getCSS()}</style>
     </head>
     <body>
