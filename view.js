@@ -297,6 +297,18 @@ function getCSS() {
       background: #8b5cf6;
       color: #fff;
     }
+    .block.continued {
+      opacity: 0.2;
+      position: relative;
+    }
+    .block.continued::after {
+      content: '↻';
+      position: absolute;
+      top: 2px;
+      right: 5px;
+      font-size: 0.8em;
+      opacity: 0.6;
+    }
 
     pre {
       margin: 0;
@@ -448,9 +460,83 @@ function getClientJS() {
       detailPanel.innerHTML = '<h3>' + formatBlockType(blockData.type) + '-' + displayId + '</h3>' + renderDetailContent(blockData.content);
     }
 
-    function renderBlocks(exampleId, trace, traceIdx) {
+    // Generate hash sequence for a request trace to compare with previous requests
+    function generateBlockHashSequence(trace) {
+      const hashes = [];
+
+      if (trace.type !== 'request') return hashes;
+
+      // System blocks
+      if (trace.data.system) {
+        const systemItems = Array.isArray(trace.data.system) ? trace.data.system : [trace.data.system];
+        systemItems.forEach(item => {
+          hashes.push(simpleHash(JSON.stringify(item)));
+        });
+      }
+
+      // Tool blocks
+      if (trace.data.tools && trace.data.tools.length > 0) {
+        trace.data.tools.forEach(tool => {
+          hashes.push(simpleHash(JSON.stringify(tool)));
+        });
+      }
+
+      // Message blocks
+      if (trace.data.messages) {
+        trace.data.messages.forEach(msg => {
+          const isContentArray = Array.isArray(msg.content);
+          if (isContentArray && msg.content.length > 0) {
+            msg.content.forEach(contentItem => {
+              hashes.push(simpleHash(JSON.stringify(contentItem)));
+            });
+          } else {
+            hashes.push(simpleHash(JSON.stringify(msg)));
+          }
+        });
+      }
+
+      return hashes;
+    }
+
+    // Compare two hash sequences and return the number of matching prefix blocks
+    function countMatchingPrefixBlocks(prevHashes, currentHashes) {
+      let count = 0;
+      const minLength = Math.min(prevHashes.length, currentHashes.length);
+
+      for (let i = 0; i < minLength; i++) {
+        if (prevHashes[i] === currentHashes[i]) {
+          count++;
+        } else {
+          break; // Stop at first mismatch
+        }
+      }
+
+      return count;
+    }
+
+    function renderBlocks(exampleId, trace, traceIdx, previousTrace) {
       let html = '';
       let blockIdx = 0;
+      let continuedBlockCount = 0;
+
+      // Count system blocks in current trace
+      let systemBlockCount = 0;
+      if (trace.type === 'request' && trace.data.system) {
+        const systemItems = Array.isArray(trace.data.system) ? trace.data.system : [trace.data.system];
+        systemBlockCount = systemItems.length;
+      }
+
+      // Calculate how many blocks are continued from previous request
+      if (previousTrace && previousTrace.type === 'request') {
+        const prevHashes = generateBlockHashSequence(previousTrace);
+        const currentHashes = generateBlockHashSequence(trace);
+        const matchingCount = countMatchingPrefixBlocks(prevHashes, currentHashes);
+
+        // Only apply continuation style if more than just system blocks match
+        if (matchingCount > systemBlockCount) {
+          continuedBlockCount = matchingCount;
+        }
+      }
 
       if (trace.type === 'request') {
         // First render system blocks if exists
@@ -470,7 +556,8 @@ function getClientJS() {
               content: item
             };
 
-            html += '<div id="block-' + exampleId + '-' + blockId + '" class="block system" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+            const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
+            html += '<div id="block-' + exampleId + '-' + blockId + '" class="block system' + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
             html += 'System-' + displayId;
             html += '</div>';
             blockIdx++;
@@ -488,7 +575,8 @@ function getClientJS() {
               content: tool
             };
 
-            html += '<div id="block-' + exampleId + '-' + blockId + '" class="block tool" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+            const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
+            html += '<div id="block-' + exampleId + '-' + blockId + '" class="block tool' + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
             html += 'Tool-' + toolName;
             html += '</div>';
             blockIdx++;
@@ -537,7 +625,8 @@ function getClientJS() {
                   content: contentItem
                 };
 
-                html += '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + blockType + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+                const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
+                html += '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + blockType + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
                 html += formatBlockType(blockType) + '-' + displayId;
                 html += '</div>';
                 blockIdx++;
@@ -553,7 +642,8 @@ function getClientJS() {
                 content: msg
               };
 
-              html += '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + role + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+              const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
+              html += '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + role + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
               html += formatBlockType(role) + '-' + displayId;
               html += '</div>';
               blockIdx++;
@@ -592,8 +682,17 @@ function getClientJS() {
 
         // Render blocks for requests
         if (trace.type === 'request') {
+          // Find the previous request trace (not response)
+          let previousRequestTrace = null;
+          for (let i = idx - 1; i >= 0; i--) {
+            if (data.llmTraces[i].type === 'request') {
+              previousRequestTrace = data.llmTraces[i];
+              break;
+            }
+          }
+
           html += '<div class="blocks-container">';
-          html += renderBlocks(exampleId, trace, idx);
+          html += renderBlocks(exampleId, trace, idx, previousRequestTrace);
           html += '</div>';
         } else {
           // For responses, show raw JSON on click
