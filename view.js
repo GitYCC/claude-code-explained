@@ -204,6 +204,11 @@ function parseLLMFile(filePath) {
 
         data = filteredData;
       }
+
+      // For responses, only keep content if it exists
+      if (type === 'response' && data.content !== undefined) {
+        data = { content: data.content };
+      }
     } catch (e) {
       // If JSON parse fails, store as raw text
       data = { raw: bodyContent };
@@ -249,6 +254,20 @@ function parseExample(exampleId) {
 
 // ============ HTML Generation Functions ============
 
+/**
+ * Escape HTML special characters to prevent XSS and rendering issues
+ */
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, char => map[char]);
+}
+
 function getCSS() {
   return `
     * { box-sizing: border-box; }
@@ -286,7 +305,11 @@ function getCSS() {
       transition: background 0.2s;
     }
     .event:hover { background: #3e3e42; }
-    .event.response { border-left-color: #4ec9b0; }
+    .event.response {
+      border-left-color: #4ec9b0;
+      margin-top: 0;
+      margin-bottom: 30px;
+    }
     .event-header {
       display: flex;
       justify-content: space-between;
@@ -318,11 +341,11 @@ function getCSS() {
       margin-top: 20px;
     }
     .blocks-panel {
-      flex: 2;
+      flex: 1;
       min-width: 0;
     }
     .detail-panel {
-      flex: 3;
+      flex: 1;
       background: #252526;
       border: 1px solid #3e3e42;
       border-radius: 4px;
@@ -458,6 +481,20 @@ function getCSS() {
 
 function getClientJS() {
   return `
+    /**
+     * Escape HTML special characters to prevent XSS and rendering issues
+     */
+    function escapeHtml(text) {
+      const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      };
+      return text.replace(/[&<>"']/g, char => map[char]);
+    }
+
     function toggleDetail(id) {
       const detail = document.getElementById('detail-' + id);
       detail.classList.toggle('show');
@@ -550,19 +587,23 @@ function getClientJS() {
 
       if (!blockData) return;
 
-      // Determine display ID based on block type
-      let displayId = '';
-      if (blockData.type === 'tool' && blockData.content.name) {
-        displayId = blockData.content.name;
-      } else if (blockData.type === 'tool_use' && blockData.content.id && blockData.content.id.startsWith('toolu_')) {
-        const idPart = blockData.content.id.substring(6);
-        displayId = idPart.substring(0, 4).toUpperCase();
-      } else if (blockData.type === 'tool_result' && blockData.content.tool_use_id && blockData.content.tool_use_id.startsWith('toolu_')) {
-        const idPart = blockData.content.tool_use_id.substring(6);
-        displayId = idPart.substring(0, 4).toUpperCase();
-      } else {
-        const hash = simpleHash(JSON.stringify(blockData.content));
-        displayId = hash.substring(0, 4).toUpperCase();
+      // Use displayId from blockData if available
+      let displayId = blockData.displayId || '';
+
+      // Fallback: determine display ID based on block type (for backward compatibility)
+      if (!displayId) {
+        if (blockData.type === 'tool' && blockData.content.name) {
+          displayId = blockData.content.name;
+        } else if (blockData.type === 'tool_use' && blockData.content.id && blockData.content.id.startsWith('toolu_')) {
+          const idPart = blockData.content.id.substring(6);
+          displayId = idPart.substring(0, 4).toUpperCase();
+        } else if (blockData.type === 'tool_result' && blockData.content.tool_use_id && blockData.content.tool_use_id.startsWith('toolu_')) {
+          const idPart = blockData.content.tool_use_id.substring(6);
+          displayId = idPart.substring(0, 4).toUpperCase();
+        } else {
+          const hash = simpleHash(JSON.stringify(blockData.content));
+          displayId = hash.substring(0, 4).toUpperCase();
+        }
       }
 
       // Update selected state
@@ -631,10 +672,29 @@ function getClientJS() {
       return count;
     }
 
-    function renderBlocks(exampleId, trace, traceIdx, previousTrace) {
+    function renderBlocks(exampleId, trace, traceIdx, previousTrace, allTraces) {
       let html = '';
       let blockIdx = 0;
       let continuedBlockCount = 0;
+
+      // Build toolUseMap from all previous traces including current
+      const toolUseMap = {};
+      if (allTraces) {
+        for (let i = 0; i <= traceIdx; i++) {
+          const t = allTraces[i];
+          if (t.type === 'request' && t.data.messages) {
+            t.data.messages.forEach(msg => {
+              if (Array.isArray(msg.content)) {
+                msg.content.forEach(item => {
+                  if (item.type === 'tool_use' && item.id && item.name) {
+                    toolUseMap[item.id] = item.name;
+                  }
+                });
+              }
+            });
+          }
+        }
+      }
 
       // Count system blocks in current trace
       let systemBlockCount = 0;
@@ -670,7 +730,8 @@ function getClientJS() {
 
             blockDataStore[exampleId + '-' + blockId] = {
               type: 'system',
-              content: item
+              content: item,
+              displayId: displayId
             };
 
             const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
@@ -689,7 +750,8 @@ function getClientJS() {
 
             blockDataStore[exampleId + '-' + blockId] = {
               type: 'tool',
-              content: tool
+              content: tool,
+              displayId: toolName
             };
 
             const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
@@ -719,17 +781,23 @@ function getClientJS() {
 
                 if (contentItem.type === 'tool_use') {
                   blockType = 'tool_use';
+                  const toolName = contentItem.name || 'unknown';
                   // Extract last 4 chars after 'toolu_' from id
                   if (contentItem.id && contentItem.id.startsWith('toolu_')) {
                     const idPart = contentItem.id.substring(6); // Remove 'toolu_'
-                    displayId = idPart.substring(0, 4).toUpperCase();
+                    displayId = toolName + '-' + idPart.substring(0, 4).toUpperCase();
                   }
                 } else if (contentItem.type === 'tool_result') {
                   blockType = 'tool_result';
+                  const toolName = toolUseMap[contentItem.tool_use_id] || '';
                   // Extract last 4 chars after 'toolu_' from tool_use_id
                   if (contentItem.tool_use_id && contentItem.tool_use_id.startsWith('toolu_')) {
                     const idPart = contentItem.tool_use_id.substring(6); // Remove 'toolu_'
-                    displayId = idPart.substring(0, 4).toUpperCase();
+                    if (toolName) {
+                      displayId = toolName + '-' + idPart.substring(0, 4).toUpperCase();
+                    } else {
+                      displayId = idPart.substring(0, 4).toUpperCase();
+                    }
                   }
                 } else {
                   // For other types, use first 4 chars of hash in uppercase
@@ -739,7 +807,8 @@ function getClientJS() {
 
                 blockDataStore[exampleId + '-' + blockId] = {
                   type: blockType,
-                  content: contentItem
+                  content: contentItem,
+                  displayId: displayId
                 };
 
                 const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
@@ -756,7 +825,8 @@ function getClientJS() {
 
               blockDataStore[exampleId + '-' + blockId] = {
                 type: role,
-                content: msg
+                content: msg,
+                displayId: displayId
               };
 
               const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
@@ -809,20 +879,17 @@ function getClientJS() {
           }
 
           html += '<div class="blocks-container">';
-          html += renderBlocks(exampleId, trace, idx, previousRequestTrace);
+          html += renderBlocks(exampleId, trace, idx, previousRequestTrace, data.llmTraces);
           html += '</div>';
         } else {
-          // For responses, show raw JSON on click
-          html += '<div onclick="toggleDetail(\\'' + exampleId + '-' + idx + '\\')" style="cursor: pointer; margin-top: 10px; color: #858585;">';
-          html += 'Click to view response details ▼';
-          html += '</div>';
-          html += '<div id="detail-' + exampleId + '-' + idx + '" class="detail">';
+          // For responses, always show content (no collapse)
+          html += '<div class="detail show">';
 
           // Check if data contains only a "raw" field - display it as plain text
           if (trace.data && Object.keys(trace.data).length === 1 && trace.data.raw !== undefined) {
-            html += '<pre style="color: #ce9178; white-space: pre-wrap; word-wrap: break-word;">' + trace.data.raw + '</pre>';
+            html += '<pre style="color: #ce9178; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(trace.data.raw) + '</pre>';
           } else {
-            html += '<pre>' + JSON.stringify(trace.data, null, 2) + '</pre>';
+            html += '<pre>' + escapeHtml(JSON.stringify(trace.data, null, 2)) + '</pre>';
           }
 
           html += '</div>';
