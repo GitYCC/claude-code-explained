@@ -334,24 +334,25 @@ function getClientJS() {
       detail.classList.toggle('show');
     }
 
-    async function loadExampleDetail(exampleId) {
-      const detailDiv = document.getElementById('example-detail-' + exampleId);
+    async function handleExampleChange() {
+      const select = document.getElementById('example-select');
+      const exampleId = select.value;
+      const detailContainer = document.getElementById('example-detail-container');
 
-      if (detailDiv.innerHTML && detailDiv.style.display === 'block') {
-        detailDiv.style.display = 'none';
+      if (!exampleId) {
+        detailContainer.innerHTML = '';
         return;
       }
 
-      detailDiv.innerHTML = '<div class="loading">載入中...</div>';
-      detailDiv.style.display = 'block';
+      detailContainer.innerHTML = '<div class="loading">Loading...</div>';
 
       try {
         const response = await fetch('/api/example/' + exampleId);
         const data = await response.json();
 
-        renderExampleDetail(exampleId, data);
+        renderExampleDetail(exampleId, data, detailContainer);
       } catch (error) {
-        detailDiv.innerHTML = '<div class="loading">載入失敗: ' + error.message + '</div>';
+        detailContainer.innerHTML = '<div class="loading">Loading failed: ' + error.message + '</div>';
       }
     }
 
@@ -564,8 +565,8 @@ function getClientJS() {
       return html;
     }
 
-    function renderExampleDetail(exampleId, data) {
-      const detailDiv = document.getElementById('example-detail-' + exampleId);
+    function renderExampleDetail(exampleId, data, detailContainer) {
+      const detailDiv = detailContainer;
 
       // Clear old block data for this example
       Object.keys(blockDataStore).forEach(key => {
@@ -574,20 +575,7 @@ function getClientJS() {
         }
       });
 
-      const stats = {
-        totalTraces: data.llmTraces.length,
-        requests: data.llmTraces.filter(t => t.type === 'request').length,
-        responses: data.llmTraces.filter(t => t.type === 'response').length
-      };
-
-      let html = '<div class="stats">';
-      html += '<h3>📊 統計資訊</h3>';
-      html += '<div class="stat-item">總追蹤數: ' + stats.totalTraces + '</div>';
-      html += '<div class="stat-item">請求數: ' + stats.requests + '</div>';
-      html += '<div class="stat-item">回應數: ' + stats.responses + '</div>';
-      html += '</div>';
-
-      html += '<div class="split-view">';
+      let html = '<div class="split-view">';
       html += '<div class="blocks-panel">';
       html += '<div class="timeline">';
 
@@ -610,7 +598,7 @@ function getClientJS() {
         } else {
           // For responses, show raw JSON on click
           html += '<div onclick="toggleDetail(\\'' + exampleId + '-' + idx + '\\')" style="cursor: pointer; margin-top: 10px; color: #858585;">';
-          html += '點擊查看回應詳情 ▼';
+          html += 'Click to view response details ▼';
           html += '</div>';
           html += '<div id="detail-' + exampleId + '-' + idx + '" class="detail">';
           html += '<pre>' + JSON.stringify(trace.data, null, 2) + '</pre>';
@@ -623,8 +611,8 @@ function getClientJS() {
       html += '</div>';
       html += '</div>';
       html += '<div id="detail-panel-' + exampleId + '" class="detail-panel">';
-      html += '<h3>選擇一個 block 查看詳情</h3>';
-      html += '<p style="color: #858585;">點擊左側的 block 以查看詳細內容</p>';
+      html += '<h3>Select a block to view details</h3>';
+      html += '<p style="color: #858585;">Click a block on the left to view detailed content</p>';
       html += '</div>';
       html += '</div>';
 
@@ -633,24 +621,27 @@ function getClientJS() {
   `;
 }
 
-function renderExamplesList(examples) {
-  return examples.map(ex => `
-    <div class="example">
-      <h2>📁 ${ex.name}</h2>
-      <p style="color: #858585;">ID: ${ex.id}</p>
-      <button onclick="loadExampleDetail('${ex.id}')"
-              style="background: #007acc; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">
-        查看時間軸
-      </button>
-      <div id="example-detail-${ex.id}" style="display: none; margin-top: 20px;"></div>
-    </div>
-  `).join('');
+function renderExampleSelector(examples) {
+  let html = '<div class="example-selector" style="margin: 20px 0;">';
+  html += '<label for="example-select" style="display: block; margin-bottom: 10px; color: #4ec9b0; font-weight: bold;">Select Example:</label>';
+  html += '<select id="example-select" onchange="handleExampleChange()" style="width: 100%; padding: 10px; background: #2d2d30; color: #d4d4d4; border: 1px solid #3e3e42; border-radius: 4px; font-family: inherit; font-size: 14px;">';
+  html += '<option value="">-- Choose an example --</option>';
+
+  examples.forEach(ex => {
+    html += `<option value="${ex.id}">${ex.id}</option>`;
+  });
+
+  html += '</select>';
+  html += '</div>';
+  html += '<div id="example-detail-container" style="margin-top: 20px;"></div>';
+
+  return html;
 }
 
 function generateHTML(examples) {
   return `
     <!DOCTYPE html>
-    <html lang="zh-TW">
+    <html lang="en">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -662,10 +653,10 @@ function generateHTML(examples) {
       <div class="container">
         <h1>🔍 Claude Code Execution Viewer</h1>
         <p style="color: #858585; margin-bottom: 30px;">
-          互動式視覺化工具，用於查看 Claude Code 的執行追蹤記錄
+          Interactive visualization tool for viewing Claude Code execution traces
         </p>
         <div id="examples">
-          ${renderExamplesList(examples)}
+          ${renderExampleSelector(examples)}
         </div>
       </div>
       <script>${getClientJS()}</script>
