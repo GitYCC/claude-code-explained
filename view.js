@@ -44,6 +44,112 @@ function removeUnwantedFields(obj) {
 }
 
 /**
+ * Parse SSE (Server-Sent Events) streaming response
+ */
+function parseSSEResponse(bodyContent) {
+  const lines = bodyContent.split('\n');
+  const events = [];
+  let currentEvent = null;
+
+  for (const line of lines) {
+    if (line.startsWith('event: ')) {
+      if (currentEvent) {
+        events.push(currentEvent);
+      }
+      currentEvent = { type: line.substring(7).trim(), data: null };
+    } else if (line.startsWith('data: ')) {
+      if (currentEvent) {
+        const dataStr = line.substring(6).trim();
+        try {
+          currentEvent.data = JSON.parse(dataStr);
+        } catch (e) {
+          currentEvent.data = dataStr;
+        }
+      }
+    } else if (line.trim() === '' && currentEvent) {
+      events.push(currentEvent);
+      currentEvent = null;
+    }
+  }
+
+  if (currentEvent) {
+    events.push(currentEvent);
+  }
+
+  // Merge streaming events into final message
+  let message = {
+    model: '',
+    id: '',
+    type: 'message',
+    role: 'assistant',
+    content: [],
+    stop_reason: null,
+    stop_sequence: null,
+    usage: {}
+  };
+
+  const contentBlocks = {};
+
+  for (const event of events) {
+    if (!event.data) continue;
+
+    if (event.type === 'message_start') {
+      // Initialize message from message_start
+      const msg = event.data.message;
+      message.model = msg.model;
+      message.id = msg.id;
+      message.usage = msg.usage;
+    } else if (event.type === 'content_block_start') {
+      // Start a new content block
+      const index = event.data.index;
+      contentBlocks[index] = { ...event.data.content_block };
+    } else if (event.type === 'content_block_delta') {
+      // Append delta to content block
+      const index = event.data.index;
+      const delta = event.data.delta;
+
+      if (!contentBlocks[index]) {
+        contentBlocks[index] = { type: delta.type.replace('_delta', '') };
+      }
+
+      // Merge delta content
+      if (delta.type === 'text_delta') {
+        contentBlocks[index].text = (contentBlocks[index].text || '') + delta.text;
+      } else if (delta.type === 'thinking_delta') {
+        contentBlocks[index].thinking = (contentBlocks[index].thinking || '') + delta.thinking;
+      } else if (delta.type === 'input_json_delta') {
+        contentBlocks[index].input = (contentBlocks[index].input || '') + delta.partial_json;
+      }
+    } else if (event.type === 'content_block_stop') {
+      // Content block is complete
+      // No additional action needed
+    } else if (event.type === 'message_delta') {
+      // Update message-level fields
+      if (event.data.delta) {
+        if (event.data.delta.stop_reason) {
+          message.stop_reason = event.data.delta.stop_reason;
+        }
+        if (event.data.delta.stop_sequence) {
+          message.stop_sequence = event.data.delta.stop_sequence;
+        }
+      }
+      if (event.data.usage) {
+        message.usage.output_tokens = event.data.usage.output_tokens;
+      }
+    } else if (event.type === 'message_stop') {
+      // Message is complete
+      // No additional action needed
+    }
+  }
+
+  // Convert contentBlocks to array
+  const contentIndexes = Object.keys(contentBlocks).map(k => parseInt(k)).sort((a, b) => a - b);
+  message.content = contentIndexes.map(idx => contentBlocks[idx]);
+
+  return message;
+}
+
+/**
  * Parse a single LLM trace file (Request or Response)
  */
 function parseLLMFile(filePath) {
@@ -68,8 +174,19 @@ function parseLLMFile(filePath) {
   let data = {};
   if (bodyStartIndex !== -1 && bodyStartIndex < lines.length - 1) {
     const bodyContent = lines.slice(bodyStartIndex + 1).join('\n');
+
+    // Check if this is a streaming response (SSE format)
+    const headers = lines.slice(0, bodyStartIndex).join('\n');
+    const isStreaming = headers.includes('text/event-stream');
+
     try {
-      data = JSON.parse(bodyContent);
+      if (type === 'response' && isStreaming) {
+        // Parse SSE streaming response
+        data = parseSSEResponse(bodyContent);
+      } else {
+        // Parse regular JSON
+        data = JSON.parse(bodyContent);
+      }
 
       // Remove unwanted fields from all data
       data = removeUnwantedFields(data);
@@ -700,7 +817,14 @@ function getClientJS() {
           html += 'Click to view response details ▼';
           html += '</div>';
           html += '<div id="detail-' + exampleId + '-' + idx + '" class="detail">';
-          html += '<pre>' + JSON.stringify(trace.data, null, 2) + '</pre>';
+
+          // Check if data contains only a "raw" field - display it as plain text
+          if (trace.data && Object.keys(trace.data).length === 1 && trace.data.raw !== undefined) {
+            html += '<pre style="color: #ce9178; white-space: pre-wrap; word-wrap: break-word;">' + trace.data.raw + '</pre>';
+          } else {
+            html += '<pre>' + JSON.stringify(trace.data, null, 2) + '</pre>';
+          }
+
           html += '</div>';
         }
 

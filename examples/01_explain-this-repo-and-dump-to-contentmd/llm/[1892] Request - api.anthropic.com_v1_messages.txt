@@ -1,0 +1,55 @@
+POST /v1/messages?beta=true HTTP/1.1
+host: api.anthropic.com
+connection: keep-alive
+Accept: application/json
+X-Stainless-Retry-Count: 0
+X-Stainless-Timeout: 600
+X-Stainless-Lang: js
+X-Stainless-Package-Version: 0.70.0
+X-Stainless-OS: MacOS
+X-Stainless-Arch: arm64
+X-Stainless-Runtime: node
+X-Stainless-Runtime-Version: v25.2.1
+anthropic-dangerous-direct-browser-access: true
+anthropic-version: 2023-06-01
+authorization: Bearer sk-api-key-here
+x-app: cli
+User-Agent: claude-cli/2.0.76 (external, cli)
+content-type: application/json
+anthropic-beta: oauth-2025-04-20,interleaved-thinking-2025-05-14
+x-stainless-helper-method: stream
+accept-language: *
+sec-fetch-mode: cors
+accept-encoding: br, gzip, deflate
+content-length: 1701
+
+{
+  "model": "claude-haiku-4-5-20251001",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Files modified by user:\n    15 README.md\n    13 tempdd/handlers/init.py\n     9 pyproject.toml\n     7 tempdd/core/controllers/controller_default.py\n     4 tempdd/cli.py\n     4 tempdd/handlers/ai.py\n     3 tempdd/handlers/ui_helpers.py\n     2 tempdd/file_manager.py\n     2 tempdd/handlers/help.py\n     1 misc/banner.png\n     1 tests/test_commands.py\n     1 tempdd/utils.py\n     1 tempdd/integrations/claudecode/commands/tempdd.md\n     1 tests/test_controller.py\n     1 tempdd/core/templates/template_arch_default.md\n     1 tempdd/core/templates/template_blueprint_default.md\n     1 tempdd/core/templates/template_prd_default.md\n     1 tempdd/core/templates/template_research_default.md\n     1 tempdd/core/templates/template_tasks_default.md\n     1 tempdd/core/default_config.json"
+        }
+      ]
+    }
+  ],
+  "system": [
+    {
+      "type": "text",
+      "text": "You are Claude Code, Anthropic's official CLI for Claude."
+    },
+    {
+      "type": "text",
+      "text": "You are an expert at analyzing git history. Given a list of files and their modification counts, return exactly five filenames that are frequently modified and represent core application logic (not auto-generated files, dependencies, or configuration). Make sure filenames are diverse, not all in the same folder, and are a mix of user and other users. Return only the filenames' basenames (without the path) separated by newlines with no explanation."
+    }
+  ],
+  "tools": [],
+  "metadata": {
+    "user_id": "user_f7c53f685190e59f3f0cd72d0a5d8319cb9bf916993925befd145ade71b437ee_account_4c3bcb02-4afd-4048-9f34-a4477aa92825_session_07bf99a1-022c-48ac-bf82-2e62485d82f8"
+  },
+  "max_tokens": 32000,
+  "stream": true
+}

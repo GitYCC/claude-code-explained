@@ -1,0 +1,18 @@
+HTTP/1.1 200 OK
+Date: Mon, 29 Dec 2025 15:34:08 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+request-id: req_011CWbDryZz3CHUJdzYg3W3Q
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+anthropic-organization-id: 00285922-43fe-44d0-bad4-335a7278008f
+Server: cloudflare
+x-envoy-upstream-service-time: 162
+cf-cache-status: DYNAMIC
+X-Robots-Tag: none
+Content-Encoding: gzip
+CF-RAY: 9b5a5c1e2f22f073-KHH
+
+{
+  "input_tokens": 15217
+}
