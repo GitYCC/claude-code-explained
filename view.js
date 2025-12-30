@@ -923,11 +923,15 @@ function startServer() {
   });
 }
 
-// Export functions for testing
+// Export functions for reuse
 module.exports = {
   scanExamples,
   parseLLMFile,
-  parseExample
+  parseExample,
+  getCSS,
+  getClientJS,
+  generateHTML,
+  renderExampleSelector
 };
 
 // Only run server if executed directly (not during testing)

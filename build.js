@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { scanExamples, parseExample } = require('./view.js');
+const { scanExamples, parseExample, getCSS, getClientJS } = require('./view.js');
 
 /**
  * Build static site from view.js dynamic content
@@ -13,108 +13,22 @@ if (!fs.existsSync(OUTPUT_DIR)) {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 }
 
-// Get CSS styles
-function getCSS() {
-  return `
-    * { box-sizing: border-box; }
-    body {
-      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-      margin: 0;
-      padding: 20px;
-      background: #1e1e1e;
-      color: #d4d4d4;
-    }
-    .container { max-width: 1200px; margin: 0 auto; }
-    h1 {
-      color: #4ec9b0;
-      border-bottom: 2px solid #4ec9b0;
-      padding-bottom: 10px;
-    }
-    .example {
-      background: #252526;
-      border: 1px solid #3e3e42;
-      border-radius: 4px;
-      padding: 20px;
-      margin: 20px 0;
-    }
-    .example h2 {
-      color: #dcdcaa;
-      margin-top: 0;
-    }
-    .timeline { margin: 20px 0; }
-    .event {
-      background: #2d2d30;
-      border-left: 3px solid #007acc;
-      padding: 12px;
-      margin: 8px 0;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .event:hover { background: #3e3e42; }
-    .event.response { border-left-color: #4ec9b0; }
-    .event-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .event-title {
-      font-weight: bold;
-      color: #569cd6;
-    }
-    .event-meta {
-      font-size: 0.9em;
-      color: #858585;
-    }
-    .detail {
-      display: none;
-      background: #1e1e1e;
-      padding: 15px;
-      margin-top: 10px;
-      border-radius: 4px;
-      max-height: 500px;
-      overflow: auto;
-    }
-    .detail.show { display: block; }
-    pre {
-      margin: 0;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      color: #ce9178;
-    }
-    .stats {
-      background: #252526;
-      border: 1px solid #3e3e42;
-      border-radius: 4px;
-      padding: 15px;
-      margin: 20px 0;
-    }
-    .stats h3 {
-      margin-top: 0;
-      color: #4ec9b0;
-    }
-    .stat-item {
-      padding: 5px 0;
-      color: #d4d4d4;
-    }
-    .loading {
-      text-align: center;
-      padding: 20px;
-      color: #858585;
-    }
-  `;
-}
+// Generate client-side JavaScript with embedded data (static version)
+function getClientJSStatic(examplesData) {
+  // Get the core client JS from view.js and extract the reusable functions
+  const dynamicClientJS = getClientJS();
 
-// Generate client-side JavaScript with embedded data
-function getClientJS(examplesData) {
+  // Extract the core functions (everything except handleExampleChange)
+  // We'll replace the fetch-based loader with embedded data loader
+  const coreJS = dynamicClientJS
+    .replace(/async function handleExampleChange\(\) \{[\s\S]*?\n    \}/, '') // Remove dynamic loader
+    .trim();
+
   return `
     // Embedded example data
     const EXAMPLES_DATA = ${JSON.stringify(examplesData, null, 2)};
 
-    function toggleDetail(id) {
-      const detail = document.getElementById('detail-' + id);
-      detail.classList.toggle('show');
-    }
-
+    // Static data loader (replaces fetch-based loader)
     function loadExampleDetail(exampleId) {
       const detailDiv = document.getElementById('example-detail-' + exampleId);
 
@@ -133,46 +47,14 @@ function getClientJS(examplesData) {
         return;
       }
 
-      renderExampleDetail(exampleId, data);
+      renderExampleDetail(exampleId, data, detailDiv);
     }
 
-    function renderExampleDetail(exampleId, data) {
-      const detailDiv = document.getElementById('example-detail-' + exampleId);
-
-      const stats = {
-        totalTraces: data.llmTraces.length,
-        requests: data.llmTraces.filter(t => t.type === 'request').length,
-        responses: data.llmTraces.filter(t => t.type === 'response').length
-      };
-
-      let html = '<div class="stats">';
-      html += '<h3>📊 Statistics</h3>';
-      html += '<div class="stat-item">Total Traces: ' + stats.totalTraces + '</div>';
-      html += '<div class="stat-item">Requests: ' + stats.requests + '</div>';
-      html += '<div class="stat-item">Responses: ' + stats.responses + '</div>';
-      html += '</div>';
-
-      html += '<div class="timeline">';
-      data.llmTraces.forEach((trace, idx) => {
-        const eventClass = trace.type === 'response' ? 'event response' : 'event';
-        html += '<div class="' + eventClass + '" onclick="toggleDetail(\\'' + exampleId + '-' + idx + '\\')">';
-        html += '<div class="event-header">';
-        html += '<span class="event-title">[' + trace.timestamp + '] ' + trace.type.toUpperCase() + '</span>';
-        html += '<span class="event-meta">' + trace.endpoint + '</span>';
-        html += '</div>';
-        html += '<div id="detail-' + exampleId + '-' + idx + '" class="detail">';
-        html += '<pre>' + JSON.stringify(trace.data, null, 2) + '</pre>';
-        html += '</div>';
-        html += '</div>';
-      });
-      html += '</div>';
-
-      detailDiv.innerHTML = html;
-    }
+${coreJS}
   `;
 }
 
-// Render examples list
+// Render examples list with buttons (static version)
 function renderExamplesList(examples) {
   return examples.map(ex => `
     <div class="example">
@@ -187,27 +69,28 @@ function renderExamplesList(examples) {
   `).join('');
 }
 
-// Generate complete HTML
-function generateHTML(examples, examplesData) {
+// Generate complete HTML (static version)
+function generateHTMLStatic(examples, examplesData) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🔍 Claude Code Execution Viewer</title>
+  <title>🔍 Claude Code Execution Viewer (Static)</title>
+  <script src="https://pfau-software.de/json-viewer/dist/iife/index.js"></script>
   <style>${getCSS()}</style>
 </head>
 <body>
   <div class="container">
     <h1>🔍 Claude Code Execution Viewer</h1>
     <p style="color: #858585; margin-bottom: 30px;">
-      Interactive visualization tool for viewing Claude Code execution traces
+      Interactive visualization tool for viewing Claude Code execution traces (Static Build)
     </p>
     <div id="examples">
       ${renderExamplesList(examples)}
     </div>
   </div>
-  <script>${getClientJS(examplesData)}</script>
+  <script>${getClientJSStatic(examplesData)}</script>
 </body>
 </html>
 `;
@@ -229,7 +112,7 @@ function build() {
   });
 
   // Generate HTML
-  const html = generateHTML(examples, examplesData);
+  const html = generateHTMLStatic(examples, examplesData);
 
   // Write to output directory
   const outputPath = path.join(OUTPUT_DIR, 'index.html');
