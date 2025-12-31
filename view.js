@@ -164,55 +164,47 @@ function parseLLMFile(filePath) {
   const type = filename.toLowerCase().includes('request') ? 'request' : 'response';
 
   // Extract endpoint from filename and convert to path format
-  const endpointMatch = filename.match(/api\.anthropic\.com_(.+)\.txt$/);
+  // Match both .json files and files without extension
+  const endpointMatch = filename.match(/api\.anthropic\.com_(.+?)(?:\.json)?$/);
   const endpoint = endpointMatch ? '/' + endpointMatch[1].replace(/_/g, '/') : 'unknown';
 
-  // Parse HTTP headers and body
-  const lines = content.split('\n');
-  let bodyStartIndex = lines.findIndex(line => line.trim() === '');
+  // Determine if file is JSON or SSE based on file extension
+  const isJsonFile = filename.endsWith('.json');
 
   let data = {};
-  if (bodyStartIndex !== -1 && bodyStartIndex < lines.length - 1) {
-    const bodyContent = lines.slice(bodyStartIndex + 1).join('\n');
-
-    // Check if this is a streaming response (SSE format)
-    const headers = lines.slice(0, bodyStartIndex).join('\n');
-    const isStreaming = headers.includes('text/event-stream');
-
-    try {
-      if (type === 'response' && isStreaming) {
-        // Parse SSE streaming response
-        data = parseSSEResponse(bodyContent);
-      } else {
-        // Parse regular JSON
-        data = JSON.parse(bodyContent);
-      }
-
-      // Remove unwanted fields from all data
-      data = removeUnwantedFields(data);
-
-      // For requests, only keep important fields
-      if (type === 'request') {
-        const filteredData = {};
-        const importantFields = ['model', 'messages', 'tools', 'system'];
-
-        importantFields.forEach(field => {
-          if (data[field] !== undefined) {
-            filteredData[field] = data[field];
-          }
-        });
-
-        data = filteredData;
-      }
-
-      // For responses, only keep content if it exists
-      if (type === 'response' && data.content !== undefined) {
-        data = { content: data.content };
-      }
-    } catch (e) {
-      // If JSON parse fails, store as raw text
-      data = { raw: bodyContent };
+  try {
+    if (isJsonFile) {
+      // Parse JSON directly
+      data = JSON.parse(content);
+    } else {
+      // Parse SSE streaming format
+      data = parseSSEResponse(content);
     }
+
+    // Remove unwanted fields from all data
+    data = removeUnwantedFields(data);
+
+    // For requests, only keep important fields
+    if (type === 'request') {
+      const filteredData = {};
+      const importantFields = ['model', 'messages', 'tools', 'system'];
+
+      importantFields.forEach(field => {
+        if (data[field] !== undefined) {
+          filteredData[field] = data[field];
+        }
+      });
+
+      data = filteredData;
+    }
+
+    // For responses, only keep content if it exists
+    if (type === 'response' && data.content !== undefined) {
+      data = { content: data.content };
+    }
+  } catch (e) {
+    // If parse fails, store as raw text
+    data = { raw: content };
   }
 
   return {
@@ -229,18 +221,29 @@ function parseLLMFile(filePath) {
  */
 function parseExample(exampleId) {
   const exampleDir = path.join(__dirname, 'examples', exampleId);
-  const llmDir = path.join(exampleDir, 'llm');
 
-  if (!fs.existsSync(llmDir)) {
+  if (!fs.existsSync(exampleDir)) {
     return {
       id: exampleId,
-      llmTraces: []
+      llmTraces: [],
+      cliLog: null
     };
   }
 
-  const llmFiles = fs.readdirSync(llmDir)
-    .filter(f => f.endsWith('.txt'))
-    .map(f => path.join(llmDir, f));
+  // Read CLI log file if exists (examples/XX_name.txt)
+  const cliLogPath = path.join(__dirname, 'examples', `${exampleId}.txt`);
+  let cliLog = null;
+  if (fs.existsSync(cliLogPath)) {
+    cliLog = fs.readFileSync(cliLogPath, 'utf-8');
+  }
+
+  // Read all files from example directory that match API trace pattern
+  const llmFiles = fs.readdirSync(exampleDir)
+    .filter(f => {
+      // Match both .json files and files without extension that contain API trace pattern
+      return f.includes('api.anthropic.com') && !fs.statSync(path.join(exampleDir, f)).isDirectory();
+    })
+    .map(f => path.join(exampleDir, f));
 
   const llmTraces = llmFiles
     .map(file => parseLLMFile(file))
@@ -248,7 +251,8 @@ function parseExample(exampleId) {
 
   return {
     id: exampleId,
-    llmTraces
+    llmTraces,
+    cliLog
   };
 }
 
@@ -476,6 +480,26 @@ function getCSS() {
       padding: 20px;
       color: #858585;
     }
+    .cli-log {
+      background: #0c0c0c;
+      border: 1px solid #3e3e42;
+      border-radius: 4px;
+      padding: 20px;
+      margin: 20px 0;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #d4d4d4;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .cli-log h3 {
+      margin-top: 0;
+      color: #4ec9b0;
+      border-bottom: 1px solid #3e3e42;
+      padding-bottom: 10px;
+    }
   `;
 }
 
@@ -693,6 +717,14 @@ function getClientJS() {
               }
             });
           }
+          // Also collect from response content
+          if (t.type === 'response' && t.data.content) {
+            t.data.content.forEach(item => {
+              if (item.type === 'tool_use' && item.id && item.name) {
+                toolUseMap[item.id] = item.name;
+              }
+            });
+          }
         }
       }
 
@@ -799,6 +831,14 @@ function getClientJS() {
                       displayId = idPart.substring(0, 4).toUpperCase();
                     }
                   }
+                } else if (contentItem.type === 'thinking') {
+                  blockType = 'assistant';
+                  const hash = simpleHash(JSON.stringify(contentItem));
+                  displayId = 'Think-' + hash.substring(0, 4).toUpperCase();
+                } else if (contentItem.type === 'text') {
+                  blockType = role;
+                  const hash = simpleHash(JSON.stringify(contentItem));
+                  displayId = hash.substring(0, 4).toUpperCase();
                 } else {
                   // For other types, use first 4 chars of hash in uppercase
                   const hash = simpleHash(JSON.stringify(contentItem));
@@ -837,6 +877,48 @@ function getClientJS() {
             }
           });
         }
+      } else if (trace.type === 'response') {
+        // Render response content blocks
+        if (trace.data.content && Array.isArray(trace.data.content)) {
+          trace.data.content.forEach((contentItem, contentIdx) => {
+            const blockId = 'trace' + traceIdx + '-block' + blockIdx;
+            let blockType = contentItem.type || 'text';
+            let displayId = '';
+
+            if (contentItem.type === 'text') {
+              blockType = 'assistant';
+              const hash = simpleHash(JSON.stringify(contentItem));
+              displayId = hash.substring(0, 4).toUpperCase();
+            } else if (contentItem.type === 'thinking') {
+              blockType = 'assistant';
+              const hash = simpleHash(JSON.stringify(contentItem));
+              displayId = 'Think-' + hash.substring(0, 4).toUpperCase();
+            } else if (contentItem.type === 'tool_use') {
+              blockType = 'tool_use';
+              const toolName = contentItem.name || 'unknown';
+              if (contentItem.id && contentItem.id.startsWith('toolu_')) {
+                const idPart = contentItem.id.substring(6);
+                displayId = toolName + '-' + idPart.substring(0, 4).toUpperCase();
+              } else {
+                displayId = toolName;
+              }
+            } else {
+              const hash = simpleHash(JSON.stringify(contentItem));
+              displayId = hash.substring(0, 4).toUpperCase();
+            }
+
+            blockDataStore[exampleId + '-' + blockId] = {
+              type: blockType,
+              content: contentItem,
+              displayId: displayId
+            };
+
+            html += '<div id=\"block-' + exampleId + '-' + blockId + '\" class=\"block ' + blockType + '\" onclick=\"showBlockDetail(\\\'' + exampleId + '\\\', \\\'' + blockId + '\\\')\">';
+            html += formatBlockType(blockType) + '-' + displayId;
+            html += '</div>';
+            blockIdx++;
+          });
+        }
       }
 
       return html;
@@ -854,6 +936,15 @@ function getClientJS() {
 
       let html = '<div class="split-view">';
       html += '<div class="blocks-panel">';
+
+      // Render CLI log if available
+      if (data.cliLog) {
+        html += '<div class="cli-log">';
+        html += '<h3>CLI Interaction Log</h3>';
+        html += escapeHtml(data.cliLog);
+        html += '</div>';
+      }
+
       html += '<div class="timeline">';
 
       data.llmTraces.forEach((trace, idx) => {
@@ -882,16 +973,9 @@ function getClientJS() {
           html += renderBlocks(exampleId, trace, idx, previousRequestTrace, data.llmTraces);
           html += '</div>';
         } else {
-          // For responses, always show content (no collapse)
-          html += '<div class="detail show">';
-
-          // Check if data contains only a "raw" field - display it as plain text
-          if (trace.data && Object.keys(trace.data).length === 1 && trace.data.raw !== undefined) {
-            html += '<pre style="color: #ce9178; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(trace.data.raw) + '</pre>';
-          } else {
-            html += '<pre>' + escapeHtml(JSON.stringify(trace.data, null, 2)) + '</pre>';
-          }
-
+          // For responses, also render as blocks
+          html += '<div class="blocks-container">';
+          html += renderBlocks(exampleId, trace, idx, null, data.llmTraces);
           html += '</div>';
         }
 

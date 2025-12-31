@@ -1,0 +1,50 @@
+
+ * ▗ ▗   ▖ ▖ *   Claude Code v2.0.76
+*             *  Sonnet 4.5 · Claude Pro
+ *   ▘▘ ▝▝   *   ~/Workspace/TempDD
+
+  A gift for you
+  Your rate limits are 2x higher through 12/31. Enjoy the extra room to think!
+
+> explain this repo and dump to ./CONTENT.md 
+
+⏺ I'll help you explore this repository and create a comprehensive explanation in CONTENT.md. Let me start by understanding the codebase structure.
+
+⏺ Explore(Explore repository structure)
+  ⎿  Done (33 tool uses · 50.7k tokens · 1m 35s)                           
+
+⏺ Write(CONTENT.md)
+  ⎿  Wrote 277 lines to CONTENT.md                                   
+     # TempDD Repository Overview
+     ## Comprehensive Repository Overview: TempDD
+     ### 1. Project Structure and Main Directories
+     ```
+     TempDD/
+     ├── tempdd/                          # Main package directory
+     │   ├── core/                        # Core framework components
+     … +267 lines (ctrl+o to expand)
+
+⏺ I've successfully explored the TempDD repository and created a comprehensive explanation in ./CONTENT.md. Here's what was documented:
+
+  Repository Summary
+
+  TempDD is a Template-Driven Development Framework that enables structured human-AI collaboration through customizable workflows. The explanation covers:
+
+  1. Project Structure - Complete directory layout with 10 main components
+  2. Core Purpose - Breaking development into AI-assisted documentation stages (PRD → Architecture → Research → Blueprint → Tasks)
+  3. Technologies - Python 3.8+, PyYAML, rich, readchar
+  4. Key Features:
+    - Template-driven workflow system with YAML configs
+    - Cross-AI tool integration (Claude Code, Gemini, Cursor, Copilot)
+    - Intelligent symbol system for stage dependencies
+    - Multilingual support
+    - Fully customizable workflows
+  5. Architecture - Execution flow from user commands through AI tools
+  6. Core Modules - 8 main Python modules and their responsibilities
+  7. Integration Points - How it connects with different AI development tools
+  8. Customization - Config-based workflow tailoring without code changes
+
+  The document is now available at CONTENT.md with full details about the framework's design, capabilities, and architecture.
+
+
+

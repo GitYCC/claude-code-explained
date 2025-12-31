@@ -1,0 +1,30 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Command: ls -la /Users/YC/Workspace/TempDD/tempdd/\nOutput: total 88\n-rw-r--r--   1 YC  staff     80  9月 24 09:58 __init__.py\ndrwxr-xr-x  10 YC  staff    320  9月 29 21:36 __pycache__\ndrwxr-xr-x  12 YC  staff    384  9月 29 21:32 .\ndrwxr-xr-x  19 YC  staff    608 12月 30 23:27 ..\n-rw-r--r--   1 YC  staff   4140  9月 29 21:32 cli.py\n-rw-r--r--   1 YC  staff  10989  9月 29 21:23 controller.py\ndrwxr-xr-x   4 YC  staff    128  9月 29 21:03 core\n-rw-r--r--   1 YC  staff   6097  9月 29 20:54 file_manager.py\ndrwxr-xr-x   8 YC  staff    256  9月 29 23:43 handlers\ndrwxr-xr-x   6 YC  staff    192  9月 27 22:32 integrations\n-rw-r--r--   1 YC  staff   4103  9月 26 07:47 template_parser.py\n-rw-r--r--   1 YC  staff   1438  9月 26 23:34 utils.py\n\n"
+        }
+      ]
+    }
+  ],
+  "system": [
+    {
+      "type": "text",
+      "text": "You are Claude Code, Anthropic's official CLI for Claude."
+    },
+    {
+      "type": "text",
+      "text": "Extract any file paths that this command reads or modifies. For commands like \"git diff\" and \"cat\", include the paths of files being shown. Use paths verbatim -- don't add any slashes or try to resolve them. Do not try to infer paths that were not explicitly listed in the command output.\n\nIMPORTANT: Commands that do not display the contents of the files should not return any filepaths. For eg. \"ls\", pwd\", \"find\". Even more complicated commands that don't display the contents should not be considered: eg \"find . -type f -exec ls -la {} + | sort -k5 -nr | head -5\"\n\nFirst, determine if the command displays the contents of the files. If it does, then <is_displaying_contents> tag should be true. If it does not, then <is_displaying_contents> tag should be false.\n\nFormat your response as:\n<is_displaying_contents>\ntrue\n</is_displaying_contents>\n\n<filepaths>\npath/to/file1\npath/to/file2\n</filepaths>\n\nIf no files are read or modified, return empty filepaths tags:\n<filepaths>\n</filepaths>\n\nDo not include any other text in your response."
+    }
+  ],
+  "tools": [],
+  "metadata": {
+    "user_id": "user_f7c53f685190e59f3f0cd72d0a5d8319cb9bf916993925befd145ade71b437ee_account_4c3bcb02-4afd-4048-9f34-a4477aa92825_session_32794b5f-8f88-42bf-a389-762b5e0fb726"
+  },
+  "max_tokens": 32000,
+  "stream": true
+}

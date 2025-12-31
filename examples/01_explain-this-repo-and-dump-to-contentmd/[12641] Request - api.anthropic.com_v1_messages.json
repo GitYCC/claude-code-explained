@@ -1,0 +1,30 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Command: find /Users/YC/Workspace/TempDD -type f -name \"*.json\" -o -name \"*.md\" -o -name \"*.yml\" -o -name \"*.yaml\" | head -30\nOutput: /Users/YC/Workspace/TempDD/demo/.tempdd/workflow/config.yaml\n/Users/YC/Workspace/TempDD/demo/.tempdd/workflow/templates/prd.md\n/Users/YC/Workspace/TempDD/demo/.tempdd/workflow/templates/tasks.md\n/Users/YC/Workspace/TempDD/demo/.tempdd/workflow/templates/blueprint.md\n/Users/YC/Workspace/TempDD/tempdd/core/configs/config_simple.yaml\n/Users/YC/Workspace/TempDD/tempdd/core/configs/config_default.yaml\n/Users/YC/Workspace/TempDD/tempdd/core/templates/template_blueprint_simple.md\n/Users/YC/Workspace/TempDD/tempdd/core/templates/template_blueprint_default.md\n/Users/YC/Workspace/TempDD/tempdd/core/templates/template_arch_default.md\n/Users/YC/Workspace/TempDD/tempdd/core/templates/template_tasks_default.md\n/Users/YC/Workspace/TempDD/tempdd/core/templates/template_prd_default.md\n/Users/YC/Workspace/TempDD/tempdd/core/templates/template_tasks_simple.md\n/Users/YC/Workspace/TempDD/tempdd/core/templates/template_research_default.md\n/Users/YC/Workspace/TempDD/tempdd/integrations/copilot/.github/prompts/tempdd-go.prompt.md\n/Users/YC/Workspace/TempDD/tempdd/integrations/cursor/.cursor/commands/tempdd-go.md\n/Users/YC/Workspace/TempDD/tempdd/integrations/claude/.claude/commands/tempdd-go.md\n/Users/YC/Workspace/TempDD/.pytest_cache/README.md\n/Users/YC/Workspace/TempDD/docs/operating-principles.md\n/Users/YC/Workspace/TempDD/docs/test_guideline.md\n/Users/YC/Workspace/TempDD/docs/readmes/README-ja.md\n/Users/YC/Workspace/TempDD/docs/readmes/README-es.md\n/Users/YC/Workspace/TempDD/docs/readmes/README-zh-TW.md\n/Users/YC/Workspace/TempDD/docs/readmes/README-zh-CN.md\n/Users/YC/Workspace/TempDD/README.md\n/Users/YC/Workspace/TempDD/ENV/lib/python3.10/site-packages/tempdd-0.1.0.dist-info/direct_url.json\n/Users/YC/Workspace/TempDD/ENV/lib/python3.10/site-packages/tempdd-0.1.0.dist-info/uv_cache.json\n/Users/YC/Workspace/TempDD/ENV/lib/python3.10/site-packages/markdown_it/port.yaml\n/Users/YC/Workspace/TempDD/customized/README.md\n/Users/YC/Workspace/TempDD/customized/workflow_example/config.yaml\n/Users/YC/Workspace/TempDD/customized/workflow_example/templates/prd.md\n\n"
+        }
+      ]
+    }
+  ],
+  "system": [
+    {
+      "type": "text",
+      "text": "You are Claude Code, Anthropic's official CLI for Claude."
+    },
+    {
+      "type": "text",
+      "text": "Extract any file paths that this command reads or modifies. For commands like \"git diff\" and \"cat\", include the paths of files being shown. Use paths verbatim -- don't add any slashes or try to resolve them. Do not try to infer paths that were not explicitly listed in the command output.\n\nIMPORTANT: Commands that do not display the contents of the files should not return any filepaths. For eg. \"ls\", pwd\", \"find\". Even more complicated commands that don't display the contents should not be considered: eg \"find . -type f -exec ls -la {} + | sort -k5 -nr | head -5\"\n\nFirst, determine if the command displays the contents of the files. If it does, then <is_displaying_contents> tag should be true. If it does not, then <is_displaying_contents> tag should be false.\n\nFormat your response as:\n<is_displaying_contents>\ntrue\n</is_displaying_contents>\n\n<filepaths>\npath/to/file1\npath/to/file2\n</filepaths>\n\nIf no files are read or modified, return empty filepaths tags:\n<filepaths>\n</filepaths>\n\nDo not include any other text in your response."
+    }
+  ],
+  "tools": [],
+  "metadata": {
+    "user_id": "user_f7c53f685190e59f3f0cd72d0a5d8319cb9bf916993925befd145ade71b437ee_account_4c3bcb02-4afd-4048-9f34-a4477aa92825_session_32794b5f-8f88-42bf-a389-762b5e0fb726"
+  },
+  "max_tokens": 32000,
+  "stream": true
+}

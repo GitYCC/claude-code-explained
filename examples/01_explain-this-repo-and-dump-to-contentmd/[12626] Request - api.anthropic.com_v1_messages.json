@@ -1,0 +1,30 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Command: find /Users/YC/Workspace/TempDD -maxdepth 2 -type d | sort\nOutput: /Users/YC/Workspace/TempDD\n/Users/YC/Workspace/TempDD/.git\n/Users/YC/Workspace/TempDD/.git/hooks\n/Users/YC/Workspace/TempDD/.git/info\n/Users/YC/Workspace/TempDD/.git/logs\n/Users/YC/Workspace/TempDD/.git/objects\n/Users/YC/Workspace/TempDD/.git/refs\n/Users/YC/Workspace/TempDD/.pytest_cache\n/Users/YC/Workspace/TempDD/.pytest_cache/v\n/Users/YC/Workspace/TempDD/build\n/Users/YC/Workspace/TempDD/build/bdist.macosx-11.0-arm64\n/Users/YC/Workspace/TempDD/build/lib\n/Users/YC/Workspace/TempDD/customized\n/Users/YC/Workspace/TempDD/customized/workflow_example\n/Users/YC/Workspace/TempDD/demo\n/Users/YC/Workspace/TempDD/demo/.gemini\n/Users/YC/Workspace/TempDD/demo/.tempdd\n/Users/YC/Workspace/TempDD/docs\n/Users/YC/Workspace/TempDD/docs/readmes\n/Users/YC/Workspace/TempDD/ENV\n/Users/YC/Workspace/TempDD/ENV/bin\n/Users/YC/Workspace/TempDD/ENV/lib\n/Users/YC/Workspace/TempDD/misc\n/Users/YC/Workspace/TempDD/tempdd\n/Users/YC/Workspace/TempDD/tempdd.egg-info\n/Users/YC/Workspace/TempDD/tempdd/__pycache__\n/Users/YC/Workspace/TempDD/tempdd/core\n/Users/YC/Workspace/TempDD/tempdd/handlers\n/Users/YC/Workspace/TempDD/tempdd/integrations\n/Users/YC/Workspace/TempDD/tests\n/Users/YC/Workspace/TempDD/tests/__pycache__\n\n"
+        }
+      ]
+    }
+  ],
+  "system": [
+    {
+      "type": "text",
+      "text": "You are Claude Code, Anthropic's official CLI for Claude."
+    },
+    {
+      "type": "text",
+      "text": "Extract any file paths that this command reads or modifies. For commands like \"git diff\" and \"cat\", include the paths of files being shown. Use paths verbatim -- don't add any slashes or try to resolve them. Do not try to infer paths that were not explicitly listed in the command output.\n\nIMPORTANT: Commands that do not display the contents of the files should not return any filepaths. For eg. \"ls\", pwd\", \"find\". Even more complicated commands that don't display the contents should not be considered: eg \"find . -type f -exec ls -la {} + | sort -k5 -nr | head -5\"\n\nFirst, determine if the command displays the contents of the files. If it does, then <is_displaying_contents> tag should be true. If it does not, then <is_displaying_contents> tag should be false.\n\nFormat your response as:\n<is_displaying_contents>\ntrue\n</is_displaying_contents>\n\n<filepaths>\npath/to/file1\npath/to/file2\n</filepaths>\n\nIf no files are read or modified, return empty filepaths tags:\n<filepaths>\n</filepaths>\n\nDo not include any other text in your response."
+    }
+  ],
+  "tools": [],
+  "metadata": {
+    "user_id": "user_f7c53f685190e59f3f0cd72d0a5d8319cb9bf916993925befd145ade71b437ee_account_4c3bcb02-4afd-4048-9f34-a4477aa92825_session_32794b5f-8f88-42bf-a389-762b5e0fb726"
+  },
+  "max_tokens": 32000,
+  "stream": true
+}
