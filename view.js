@@ -259,7 +259,8 @@ function parseExample(exampleId) {
     return {
       id: exampleId,
       llmTraces: [],
-      cliLog: null
+      cliLog: null,
+      levels: { main: [], 'second-rank': [] }
     };
   }
 
@@ -268,6 +269,18 @@ function parseExample(exampleId) {
   let cliLog = null;
   if (fs.existsSync(cliLogPath)) {
     cliLog = fs.readFileSync(cliLogPath, 'utf-8');
+  }
+
+  // Read level JSON if exists (examples/XX_name_level.json)
+  const levelPath = path.join(__dirname, 'examples', `${exampleId}_level.json`);
+  let levels = { main: [], 'second-rank': [] };
+  if (fs.existsSync(levelPath)) {
+    try {
+      const content = fs.readFileSync(levelPath, 'utf-8');
+      levels = JSON.parse(content);
+    } catch (e) {
+      console.error(`Failed to parse level JSON: ${e.message}`);
+    }
   }
 
   // Read all files from example directory that match API trace pattern
@@ -285,7 +298,8 @@ function parseExample(exampleId) {
   return {
     id: exampleId,
     llmTraces,
-    cliLog
+    cliLog,
+    levels
   };
 }
 
@@ -332,7 +346,51 @@ function getCSS() {
       color: #dcdcaa;
       margin-top: 0;
     }
-    .timeline { margin: 20px 0; }
+    .timeline {
+      margin: 20px 0;
+    }
+    .swimlane-headers {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 0;
+    }
+    .swimlane-header {
+      flex: 1;
+      background: #1e1e1e;
+      border: 2px solid #4ec9b0;
+      border-radius: 4px 4px 0 0;
+      padding: 12px;
+      font-weight: bold;
+      color: #4ec9b0;
+      text-align: center;
+      font-size: 14px;
+    }
+    .timeline-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .timeline-row {
+      display: flex;
+      gap: 20px;
+    }
+    .timeline-cell {
+      flex: 1;
+      border-left: 2px solid #3e3e42;
+      border-right: 2px solid #3e3e42;
+      padding: 0 10px;
+    }
+    .timeline-cell:first-child {
+      border-left: 2px solid #3e3e42;
+    }
+    .timeline-cell:last-child {
+      border-right: 2px solid #3e3e42;
+    }
+    .timeline-row:last-child .timeline-cell {
+      border-bottom: 2px solid #3e3e42;
+      border-radius: 0 0 4px 4px;
+      padding-bottom: 10px;
+    }
     .event {
       background: #2d2d30;
       border-left: 3px solid #007acc;
@@ -378,7 +436,7 @@ function getCSS() {
       margin-top: 20px;
     }
     .blocks-panel {
-      flex: 1;
+      flex: 2;
       min-width: 0;
     }
     .detail-panel {
@@ -860,7 +918,7 @@ function getClientJS() {
       return count;
     }
 
-    function renderBlocks(exampleId, trace, traceIdx, previousTrace, allTraces) {
+    function renderBlocks(exampleId, trace, traceIdx, previousTrace, allTraces, currentLevel, levels) {
       let html = '';
       let blockIdx = 0;
       let continuedBlockCount = 0;
@@ -900,14 +958,50 @@ function getClientJS() {
       }
 
       // Calculate how many blocks are continued from previous request
-      if (previousTrace && previousTrace.type === 'request') {
-        const prevHashes = generateBlockHashSequence(previousTrace);
-        const currentHashes = generateBlockHashSequence(trace);
-        const matchingCount = countMatchingPrefixBlocks(prevHashes, currentHashes);
+      // Use level-based logic: main compares with previous main, second-rank compares with previous second-rank
+      if (trace.type === 'request' && allTraces && levels) {
+        const mainSet = new Set(levels.main || []);
+        const secondRankSet = new Set(levels['second-rank'] || []);
 
-        // Only apply continuation style if more than just system blocks match
-        if (matchingCount > systemBlockCount) {
-          continuedBlockCount = matchingCount;
+        // Find the appropriate previous trace based on current level
+        let compareWithTrace = null;
+
+        if (currentLevel === 'main') {
+          // For main level, find previous main request
+          for (let i = traceIdx - 1; i >= 0; i--) {
+            if (allTraces[i].type === 'request' && mainSet.has(allTraces[i].timestamp)) {
+              compareWithTrace = allTraces[i];
+              break;
+            }
+          }
+        } else if (currentLevel === 'second') {
+          // For second-rank level, find previous second-rank request
+          // But only if not interrupted by a main request
+          for (let i = traceIdx - 1; i >= 0; i--) {
+            const t = allTraces[i];
+            if (t.type === 'request') {
+              if (mainSet.has(t.timestamp)) {
+                // Found a main request in between, stop searching
+                break;
+              } else if (secondRankSet.has(t.timestamp)) {
+                // Found a second-rank request
+                compareWithTrace = t;
+                break;
+              }
+            }
+          }
+        }
+        // For third level or other levels, don't compare (no continuation style)
+
+        if (compareWithTrace) {
+          const prevHashes = generateBlockHashSequence(compareWithTrace);
+          const currentHashes = generateBlockHashSequence(trace);
+          const matchingCount = countMatchingPrefixBlocks(prevHashes, currentHashes);
+
+          // Only apply continuation style if more than just system blocks match
+          if (matchingCount > systemBlockCount) {
+            continuedBlockCount = matchingCount;
+          }
         }
       }
 
@@ -1126,41 +1220,105 @@ function getClientJS() {
 
       html += '<div class="timeline">';
 
-      data.llmTraces.forEach((trace, idx) => {
-        const eventClass = trace.type === 'response' ? 'event response' : 'event';
-        const metaInfo = trace.type === 'request' && trace.data.model
-          ? trace.data.model + ' | ' + trace.endpoint
-          : trace.endpoint;
-        html += '<div class="' + eventClass + '">';
-        html += '<div class="event-header">';
-        html += '<span class="event-title">[' + trace.timestamp + '] ' + trace.type.toUpperCase() + '</span>';
-        html += '<span class="event-meta">' + metaInfo + '</span>';
-        html += '</div>';
+      // Build level sets for faster lookup
+      const mainSet = new Set(data.levels?.main || []);
+      const secondRankSet = new Set(data.levels?.['second-rank'] || []);
 
-        // Render blocks for requests
+      // Prepare trace levels for all traces
+      const traceLevels = [];
+      data.llmTraces.forEach((trace, idx) => {
+        // Determine the level of this trace
+        let level = 'main'; // default to main
         if (trace.type === 'request') {
-          // Find the previous request trace (not response)
-          let previousRequestTrace = null;
+          if (mainSet.has(trace.timestamp)) {
+            level = 'main';
+          } else if (secondRankSet.has(trace.timestamp)) {
+            level = 'second';
+          } else {
+            level = 'third';
+          }
+        } else if (trace.type === 'response') {
+          // For response, check the level of the previous request
           for (let i = idx - 1; i >= 0; i--) {
             if (data.llmTraces[i].type === 'request') {
-              previousRequestTrace = data.llmTraces[i];
+              if (mainSet.has(data.llmTraces[i].timestamp)) {
+                level = 'main';
+              } else if (secondRankSet.has(data.llmTraces[i].timestamp)) {
+                level = 'second';
+              } else {
+                level = 'third';
+              }
               break;
             }
           }
-
-          html += '<div class="blocks-container">';
-          html += renderBlocks(exampleId, trace, idx, previousRequestTrace, data.llmTraces);
-          html += '</div>';
-        } else {
-          // For responses, also render as blocks
-          html += '<div class="blocks-container">';
-          html += renderBlocks(exampleId, trace, idx, null, data.llmTraces);
-          html += '</div>';
         }
+        traceLevels.push(level);
+      });
+
+      // Render swimlane headers
+      html += '<div class="swimlane-headers">';
+      html += '<div class="swimlane-header">Main Flow</div>';
+      html += '<div class="swimlane-header">Second-rank Flow</div>';
+      html += '<div class="swimlane-header">Others</div>';
+      html += '</div>';
+
+      // Render timeline content as rows
+      html += '<div class="timeline-content">';
+
+      data.llmTraces.forEach((trace, idx) => {
+        const level = traceLevels[idx];
+
+        html += '<div class="timeline-row">';
+
+        // Render three cells (main, second, third)
+        ['main', 'second', 'third'].forEach(swimlaneLevel => {
+          html += '<div class="timeline-cell">';
+
+          if (level === swimlaneLevel) {
+            // This trace belongs to this swimlane
+            const eventClass = trace.type === 'response' ? 'event response' : 'event';
+            const metaInfo = trace.type === 'request' && trace.data.model
+              ? trace.data.model + ' | ' + trace.endpoint
+              : trace.endpoint;
+
+            html += '<div class="' + eventClass + '">';
+            html += '<div class="event-header">';
+            html += '<span class="event-title">[' + trace.timestamp + '] ' + trace.type.toUpperCase() + '</span>';
+            html += '<span class="event-meta">' + metaInfo + '</span>';
+            html += '</div>';
+
+            // Render blocks for requests
+            if (trace.type === 'request') {
+              // Find the previous request trace (not response)
+              let previousRequestTrace = null;
+              for (let i = idx - 1; i >= 0; i--) {
+                if (data.llmTraces[i].type === 'request') {
+                  previousRequestTrace = data.llmTraces[i];
+                  break;
+                }
+              }
+
+              html += '<div class="blocks-container">';
+              html += renderBlocks(exampleId, trace, idx, previousRequestTrace, data.llmTraces, level, data.levels);
+              html += '</div>';
+            } else {
+              // For responses, also render as blocks
+              html += '<div class="blocks-container">';
+              html += renderBlocks(exampleId, trace, idx, null, data.llmTraces, level, data.levels);
+              html += '</div>';
+            }
+
+            html += '</div>';
+          }
+          // Empty cell if this trace doesn't belong to this swimlane
+
+          html += '</div>';
+        });
 
         html += '</div>';
       });
 
+      html += '</div>';
       html += '</div>';
       html += '</div>';
       html += '<div id="detail-panel-' + exampleId + '" class="detail-panel">';
