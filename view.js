@@ -24,6 +24,39 @@ function scanExamples() {
 }
 
 /**
+ * Load system prompt templates from prompts directory
+ */
+function loadSystemPrompts() {
+  const promptsDir = path.join(__dirname, 'prompts');
+
+  if (!fs.existsSync(promptsDir)) {
+    return {};
+  }
+
+  const prompts = {};
+  const files = fs.readdirSync(promptsDir).filter(f => f.endsWith('.md'));
+
+  for (const file of files) {
+    const filePath = path.join(promptsDir, file);
+    const content = fs.readFileSync(filePath, 'utf-8');
+
+    // Extract name from filename: system-identity.md -> Identity
+    let name = file.replace(/\.md$/, '');
+    if (name.startsWith('system-')) {
+      name = name.substring(7); // Remove 'system-' prefix
+    }
+    // Capitalize first letter
+    name = name.split('-').map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join('-');
+
+    prompts[name] = content;
+  }
+
+  return prompts;
+}
+
+/**
  * Recursively remove unwanted fields from an object or array
  */
 function removeUnwantedFields(obj) {
@@ -548,6 +581,137 @@ function getClientJS() {
 
     let currentSelectedBlock = null;
     let blockDataStore = {};
+    let systemPromptsCache = {};
+
+    /**
+     * Normalize text for comparison: trim and collapse multiple whitespaces
+     */
+    function normalizeText(text) {
+      return text.trim().replace(/\\s+/g, ' ');
+    }
+
+    /**
+     * Escape special regex characters
+     */
+    function escapeRegex(str) {
+      // Escape all special regex characters
+      return str.replace(/[\\\\^$.*+?()\\[\\]{}|]/g, '\\\\$&');
+    }
+
+    /**
+     * Convert template with {{placeholders}} to a regex pattern
+     * Placeholders like {{WORKING_DIRECTORY}} become .*? (non-greedy match)
+     */
+    function templateToRegex(template) {
+      let pattern = '';
+      let i = 0;
+      let lastWasPlaceholder = false;
+
+      while (i < template.length) {
+        // Check for placeholder start
+        if (template[i] === '{' && template[i+1] === '{') {
+          // Find placeholder end
+          let endIdx = template.indexOf('}}', i + 2);
+          if (endIdx !== -1) {
+            // Replace placeholder with wildcard
+            pattern += '.*?';
+            i = endIdx + 2;
+            lastWasPlaceholder = true;
+            continue;
+          }
+        }
+
+        // Regular character - escape it
+        pattern += escapeRegex(template[i]);
+        i++;
+        lastWasPlaceholder = false;
+      }
+
+      // If template ends with placeholder, allow any content after
+      // Otherwise require exact match to end
+      const endPattern = lastWasPlaceholder ? '' : '$';
+      return new RegExp('^' + pattern + endPattern, 's');
+    }
+
+    /**
+     * Extract signature phrases from template (non-placeholder parts)
+     */
+    function extractSignatures(template) {
+      const signatures = [];
+      let i = 0;
+      let currentPhrase = '';
+
+      while (i < template.length) {
+        if (template[i] === '{' && template[i+1] === '{') {
+          // Save current phrase if it's meaningful
+          if (currentPhrase.trim().length > 10) {
+            signatures.push(currentPhrase.trim());
+          }
+          currentPhrase = '';
+
+          // Skip placeholder
+          let endIdx = template.indexOf('}}', i + 2);
+          if (endIdx !== -1) {
+            i = endIdx + 2;
+            continue;
+          }
+        }
+
+        currentPhrase += template[i];
+        i++;
+      }
+
+      // Save final phrase
+      if (currentPhrase.trim().length > 10) {
+        signatures.push(currentPhrase.trim());
+      }
+
+      return signatures;
+    }
+
+    /**
+     * Try to match system content against known prompt templates
+     * Returns the prompt name if matched, null otherwise
+     */
+    function matchSystemPrompt(systemContent, systemPrompts) {
+      // Extract text from system content
+      let contentText = '';
+      if (typeof systemContent === 'string') {
+        contentText = systemContent;
+      } else if (systemContent && typeof systemContent === 'object') {
+        // Handle {type: "text", text: "..."} structure
+        contentText = systemContent.text || JSON.stringify(systemContent);
+      } else {
+        contentText = JSON.stringify(systemContent);
+      }
+
+      const normalizedContent = normalizeText(contentText);
+
+      for (const [name, template] of Object.entries(systemPrompts)) {
+        const normalizedTemplate = normalizeText(template);
+
+        // Strategy 1: Try exact regex match first
+        const regex = templateToRegex(normalizedTemplate);
+        if (regex.test(normalizedContent)) {
+          return name;
+        }
+
+        // Strategy 2: Try signature matching (for templates with many placeholders)
+        const signatures = extractSignatures(normalizedTemplate);
+        if (signatures.length >= 3) {
+          // Check if all signatures appear in content
+          const allMatch = signatures.every(sig =>
+            normalizedContent.includes(sig)
+          );
+
+          if (allMatch) {
+            return name;
+          }
+        }
+      }
+
+      return null;
+    }
 
     // Simple hash function
     function simpleHash(str) {
@@ -756,8 +920,18 @@ function getClientJS() {
           const systemItems = Array.isArray(systemData) ? systemData : [systemData];
 
           systemItems.forEach(item => {
-            const hash = simpleHash(JSON.stringify(item));
-            const displayId = hash.substring(0, 4).toUpperCase();
+            // Try to match against known system prompts
+            let displayId = '';
+            const prompts = systemPromptsCache[exampleId] || {};
+            const matchedPromptName = matchSystemPrompt(item, prompts);
+
+            if (matchedPromptName) {
+              displayId = matchedPromptName;
+            } else {
+              const hash = simpleHash(JSON.stringify(item));
+              displayId = hash.substring(0, 4).toUpperCase();
+            }
+
             const blockId = 'trace' + traceIdx + '-block' + blockIdx;
 
             blockDataStore[exampleId + '-' + blockId] = {
@@ -927,6 +1101,11 @@ function getClientJS() {
     function renderExampleDetail(exampleId, data, detailContainer) {
       const detailDiv = detailContainer;
 
+      // Store system prompts for this example
+      if (data.systemPrompts) {
+        systemPromptsCache[exampleId] = data.systemPrompts;
+      }
+
       // Clear old block data for this example
       Object.keys(blockDataStore).forEach(key => {
         if (key.startsWith(exampleId + '-')) {
@@ -992,6 +1171,15 @@ function getClientJS() {
 
       detailDiv.innerHTML = html;
     }
+
+    // Auto-load first example on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      // Trigger change event to load the first example
+      const select = document.getElementById('example-select');
+      if (select && select.value) {
+        handleExampleChange();
+      }
+    });
   `;
 }
 
@@ -1001,8 +1189,10 @@ function renderExampleSelector(examples) {
   html += '<select id="example-select" onchange="handleExampleChange()" style="width: 100%; padding: 10px; background: #2d2d30; color: #d4d4d4; border: 1px solid #3e3e42; border-radius: 4px; font-family: inherit; font-size: 14px;">';
   html += '<option value="">-- Choose an example --</option>';
 
-  examples.forEach(ex => {
-    html += `<option value="${ex.id}">${ex.id}</option>`;
+  examples.forEach((ex, idx) => {
+    // Select first example by default
+    const selected = idx === 0 ? ' selected' : '';
+    html += `<option value="${ex.id}"${selected}>${ex.id}</option>`;
   });
 
   html += '</select>';
@@ -1057,7 +1247,8 @@ function startServer() {
   app.get('/api/example/:id', (req, res) => {
     try {
       const exampleData = parseExample(req.params.id);
-      res.json(exampleData);
+      const systemPrompts = loadSystemPrompts();
+      res.json({ ...exampleData, systemPrompts });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -1077,6 +1268,7 @@ function startServer() {
 // Export functions for reuse
 module.exports = {
   scanExamples,
+  loadSystemPrompts,
   parseLLMFile,
   parseExample,
   getCSS,
