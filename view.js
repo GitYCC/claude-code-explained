@@ -1258,7 +1258,7 @@ function getClientJS() {
       // Render swimlane headers
       html += '<div class="swimlane-headers">';
       html += '<div class="swimlane-header">Main Flow</div>';
-      html += '<div class="swimlane-header">Second-rank Flow</div>';
+      html += '<div class="swimlane-header">Task and Sub-Agent</div>';
       html += '<div class="swimlane-header">Others</div>';
       html += '</div>';
 
