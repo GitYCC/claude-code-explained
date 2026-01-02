@@ -363,7 +363,7 @@ function getCSS() {
       font-weight: bold;
       color: #4ec9b0;
       text-align: center;
-      font-size: 14px;
+      font-size: 12px;
     }
     .timeline-content {
       display: flex;
@@ -436,7 +436,7 @@ function getCSS() {
       margin-top: 20px;
     }
     .blocks-panel {
-      flex: 2;
+      flex: 1.5;
       min-width: 0;
     }
     .detail-panel {
@@ -536,13 +536,38 @@ function getCSS() {
       opacity: 0.2;
       position: relative;
     }
-    .block.continued::after {
-      content: '↻';
-      position: absolute;
-      top: 2px;
-      right: 5px;
-      font-size: 0.8em;
-      opacity: 0.6;
+    .collapsed-blocks {
+      background: #3e3e42;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 8px 12px;
+      margin: 8px 0;
+      cursor: pointer;
+      transition: background 0.2s;
+      color: #858585;
+      font-size: 0.9em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .collapsed-blocks:hover {
+      background: #4a4a4e;
+    }
+    .collapsed-blocks .arrow {
+      transition: transform 0.2s;
+      display: inline-block;
+    }
+    .collapsed-blocks.expanded .arrow {
+      transform: rotate(90deg);
+    }
+    .collapsed-content {
+      display: none;
+    }
+    .collapsed-content.show {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
     }
 
     pre {
@@ -613,6 +638,13 @@ function getClientJS() {
     function toggleDetail(id) {
       const detail = document.getElementById('detail-' + id);
       detail.classList.toggle('show');
+    }
+
+    function toggleCollapsedBlocks(id) {
+      const collapseHeader = document.getElementById('collapse-header-' + id);
+      const collapseContent = document.getElementById('collapse-content-' + id);
+      collapseHeader.classList.toggle('expanded');
+      collapseContent.classList.toggle('show');
     }
 
     async function handleExampleChange() {
@@ -927,8 +959,47 @@ function getClientJS() {
       return count;
     }
 
-    function renderBlocks(exampleId, trace, traceIdx, previousTrace, allTraces, currentLevel, levels) {
+    /**
+     * Group consecutive continued blocks and generate final HTML
+     */
+    function groupAndRenderBlocks(blocks) {
       let html = '';
+      let i = 0;
+      let collapseGroupId = 0;
+
+      while (i < blocks.length) {
+        if (blocks[i].isContinued) {
+          // Start of a continued group
+          const groupStart = i;
+          while (i < blocks.length && blocks[i].isContinued) {
+            i++;
+          }
+          const groupEnd = i;
+          const groupSize = groupEnd - groupStart;
+
+          // Generate collapsed block
+          const collapseId = 'collapse-' + Date.now() + '-' + collapseGroupId++;
+          html += '<div id="collapse-header-' + collapseId + '" class="collapsed-blocks" onclick="toggleCollapsedBlocks(\\'' + collapseId + '\\')">';
+          html += '<span class="arrow">▶</span>';
+          html += '<span>' + groupSize + ' continued from above</span>';
+          html += '</div>';
+          html += '<div id="collapse-content-' + collapseId + '" class="collapsed-content">';
+          for (let j = groupStart; j < groupEnd; j++) {
+            html += blocks[j].html;
+          }
+          html += '</div>';
+        } else {
+          // Regular block
+          html += blocks[i].html;
+          i++;
+        }
+      }
+
+      return html;
+    }
+
+    function renderBlocks(exampleId, trace, traceIdx, previousTrace, allTraces, currentLevel, levels) {
+      const blocks = []; // Collect all blocks here
       let blockIdx = 0;
       let continuedBlockCount = 0;
 
@@ -953,6 +1024,25 @@ function getClientJS() {
             t.data.content.forEach(item => {
               if (item.type === 'tool_use' && item.id && item.name) {
                 toolUseMap[item.id] = item.name;
+              }
+            });
+          }
+        }
+      }
+
+      // Collect all block hashes and tool_use ids from previous responses (for continuation detection)
+      const previousResponseHashes = new Set();
+      const previousResponseToolUseIds = new Set();
+      if (trace.type === 'request' && allTraces) {
+        for (let i = 0; i < traceIdx; i++) {
+          const t = allTraces[i];
+          if (t.type === 'response' && t.data.content) {
+            t.data.content.forEach(item => {
+              if (item.type === 'tool_use' && item.id) {
+                previousResponseToolUseIds.add(item.id);
+              } else {
+                const hash = simpleHash(JSON.stringify(item));
+                previousResponseHashes.add(hash);
               }
             });
           }
@@ -1028,11 +1118,11 @@ function getClientJS() {
             const prompts = systemPromptsCache[exampleId] || {};
             const matchedPromptName = matchSystemPrompt(item, prompts);
 
+            const itemHash = simpleHash(JSON.stringify(item));
             if (matchedPromptName) {
               displayId = matchedPromptName;
             } else {
-              const hash = simpleHash(JSON.stringify(item));
-              displayId = hash.substring(0, 4).toUpperCase();
+              displayId = itemHash.substring(0, 4).toUpperCase();
             }
 
             const blockId = 'trace' + traceIdx + '-block' + blockIdx;
@@ -1043,10 +1133,16 @@ function getClientJS() {
               displayId: displayId
             };
 
-            const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
-            html += '<div id="block-' + exampleId + '-' + blockId + '" class="block system' + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
-            html += 'System-' + displayId;
-            html += '</div>';
+            const isContinuedFromPrefix = blockIdx < continuedBlockCount;
+            const isContinuedFromResponse = previousResponseHashes.has(itemHash);
+            const isContinued = isContinuedFromPrefix || isContinuedFromResponse;
+            const continuedClass = isContinued ? ' continued' : '';
+
+            let blockHtml = '<div id="block-' + exampleId + '-' + blockId + '" class="block system' + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+            blockHtml += 'System-' + displayId;
+            blockHtml += '</div>';
+
+            blocks.push({ html: blockHtml, isContinued: isContinued });
             blockIdx++;
           });
         }
@@ -1063,10 +1159,17 @@ function getClientJS() {
               displayId: toolName
             };
 
-            const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
-            html += '<div id="block-' + exampleId + '-' + blockId + '" class="block tool' + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
-            html += 'Tool-' + toolName;
-            html += '</div>';
+            const toolHash = simpleHash(JSON.stringify(tool));
+            const isContinuedFromPrefix = blockIdx < continuedBlockCount;
+            const isContinuedFromResponse = previousResponseHashes.has(toolHash);
+            const isContinued = isContinuedFromPrefix || isContinuedFromResponse;
+            const continuedClass = isContinued ? ' continued' : '';
+
+            let blockHtml = '<div id="block-' + exampleId + '-' + blockId + '" class="block tool' + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+            blockHtml += 'Tool-' + toolName;
+            blockHtml += '</div>';
+
+            blocks.push({ html: blockHtml, isContinued: isContinued });
             blockIdx++;
           });
         }
@@ -1083,6 +1186,7 @@ function getClientJS() {
               // Split into multiple blocks, one for each content element
               msg.content.forEach((contentItem, contentIdx) => {
                 const blockId = 'trace' + traceIdx + '-block' + blockIdx;
+                const contentHash = simpleHash(JSON.stringify(contentItem));
 
                 // Determine block type based on content item type
                 let blockType = role;
@@ -1110,16 +1214,13 @@ function getClientJS() {
                   }
                 } else if (contentItem.type === 'thinking') {
                   blockType = 'assistant';
-                  const hash = simpleHash(JSON.stringify(contentItem));
-                  displayId = 'Think-' + hash.substring(0, 4).toUpperCase();
+                  displayId = 'Think-' + contentHash.substring(0, 4).toUpperCase();
                 } else if (contentItem.type === 'text') {
                   blockType = role;
-                  const hash = simpleHash(JSON.stringify(contentItem));
-                  displayId = hash.substring(0, 4).toUpperCase();
+                  displayId = contentHash.substring(0, 4).toUpperCase();
                 } else {
                   // For other types, use first 4 chars of hash in uppercase
-                  const hash = simpleHash(JSON.stringify(contentItem));
-                  displayId = hash.substring(0, 4).toUpperCase();
+                  displayId = contentHash.substring(0, 4).toUpperCase();
                 }
 
                 blockDataStore[exampleId + '-' + blockId] = {
@@ -1128,16 +1229,27 @@ function getClientJS() {
                   displayId: displayId
                 };
 
-                const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
-                html += '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + blockType + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
-                html += formatBlockType(blockType) + '-' + displayId;
-                html += '</div>';
+                const isContinuedFromPrefix = blockIdx < continuedBlockCount;
+                let isContinuedFromResponse = false;
+                if (contentItem.type === 'tool_use' && contentItem.id) {
+                  isContinuedFromResponse = previousResponseToolUseIds.has(contentItem.id);
+                } else {
+                  isContinuedFromResponse = previousResponseHashes.has(contentHash);
+                }
+                const isContinued = isContinuedFromPrefix || isContinuedFromResponse;
+                const continuedClass = isContinued ? ' continued' : '';
+
+                let blockHtml = '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + blockType + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+                blockHtml += formatBlockType(blockType) + '-' + displayId;
+                blockHtml += '</div>';
+
+                blocks.push({ html: blockHtml, isContinued: isContinued });
                 blockIdx++;
               });
             } else {
               // Single content block (string or single object)
-              const hash = simpleHash(JSON.stringify(msg));
-              const displayId = hash.substring(0, 4).toUpperCase();
+              const msgHash = simpleHash(JSON.stringify(msg));
+              const displayId = msgHash.substring(0, 4).toUpperCase();
               const blockId = 'trace' + traceIdx + '-block' + blockIdx;
 
               blockDataStore[exampleId + '-' + blockId] = {
@@ -1146,30 +1258,35 @@ function getClientJS() {
                 displayId: displayId
               };
 
-              const continuedClass = blockIdx < continuedBlockCount ? ' continued' : '';
-              html += '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + role + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
-              html += formatBlockType(role) + '-' + displayId;
-              html += '</div>';
+              const isContinuedFromPrefix = blockIdx < continuedBlockCount;
+              const isContinuedFromResponse = previousResponseHashes.has(msgHash);
+              const isContinued = isContinuedFromPrefix || isContinuedFromResponse;
+              const continuedClass = isContinued ? ' continued' : '';
+
+              let blockHtml = '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + role + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
+              blockHtml += formatBlockType(role) + '-' + displayId;
+              blockHtml += '</div>';
+
+              blocks.push({ html: blockHtml, isContinued: isContinued });
               blockIdx++;
             }
           });
         }
       } else if (trace.type === 'response') {
-        // Render response content blocks
+        // Render response content blocks (without continued detection)
         if (trace.data.content && Array.isArray(trace.data.content)) {
           trace.data.content.forEach((contentItem, contentIdx) => {
             const blockId = 'trace' + traceIdx + '-block' + blockIdx;
+            const contentHash = simpleHash(JSON.stringify(contentItem));
             let blockType = contentItem.type || 'text';
             let displayId = '';
 
             if (contentItem.type === 'text') {
               blockType = 'assistant';
-              const hash = simpleHash(JSON.stringify(contentItem));
-              displayId = hash.substring(0, 4).toUpperCase();
+              displayId = contentHash.substring(0, 4).toUpperCase();
             } else if (contentItem.type === 'thinking') {
               blockType = 'assistant';
-              const hash = simpleHash(JSON.stringify(contentItem));
-              displayId = 'Think-' + hash.substring(0, 4).toUpperCase();
+              displayId = 'Think-' + contentHash.substring(0, 4).toUpperCase();
             } else if (contentItem.type === 'tool_use') {
               blockType = 'tool_use';
               const toolName = contentItem.name || 'unknown';
@@ -1180,8 +1297,7 @@ function getClientJS() {
                 displayId = toolName;
               }
             } else {
-              const hash = simpleHash(JSON.stringify(contentItem));
-              displayId = hash.substring(0, 4).toUpperCase();
+              displayId = contentHash.substring(0, 4).toUpperCase();
             }
 
             blockDataStore[exampleId + '-' + blockId] = {
@@ -1190,15 +1306,17 @@ function getClientJS() {
               displayId: displayId
             };
 
-            html += '<div id=\"block-' + exampleId + '-' + blockId + '\" class=\"block ' + blockType + '\" onclick=\"showBlockDetail(\\\'' + exampleId + '\\\', \\\'' + blockId + '\\\')\">';
-            html += formatBlockType(blockType) + '-' + displayId;
-            html += '</div>';
+            let blockHtml = '<div id=\"block-' + exampleId + '-' + blockId + '\" class=\"block ' + blockType + '\" onclick=\"showBlockDetail(\\\'' + exampleId + '\\\', \\\'' + blockId + '\\\')\">';
+            blockHtml += formatBlockType(blockType) + '-' + displayId;
+            blockHtml += '</div>';
+
+            blocks.push({ html: blockHtml, isContinued: false });
             blockIdx++;
           });
         }
       }
 
-      return html;
+      return groupAndRenderBlocks(blocks);
     }
 
     function renderExampleDetail(exampleId, data, detailContainer) {
