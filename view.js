@@ -794,6 +794,15 @@ function getClientJS() {
       return typeMap[type] || type;
     }
 
+    function formatModelName(modelName) {
+      if (!modelName) return '';
+      // Extract simple model name: claude-sonnet-4-5-20250929 -> Sonnet
+      if (modelName.includes('sonnet')) return 'Sonnet';
+      if (modelName.includes('haiku')) return 'Haiku';
+      if (modelName.includes('opus')) return 'Opus';
+      return modelName;
+    }
+
     function renderDetailContent(content) {
       const viewerId = 'json-viewer-' + Math.random().toString(36).substr(2, 9);
       const html = '<div id="' + viewerId + '" style="margin-top: 10px;"></div>';
@@ -1278,8 +1287,8 @@ function getClientJS() {
             // This trace belongs to this swimlane
             const eventClass = trace.type === 'response' ? 'event response' : 'event';
             const metaInfo = trace.type === 'request' && trace.data.model
-              ? trace.data.model + ' | ' + trace.endpoint
-              : trace.endpoint;
+              ? formatModelName(trace.data.model)
+              : '';
 
             html += '<div class="' + eventClass + '">';
             html += '<div class="event-header">';
