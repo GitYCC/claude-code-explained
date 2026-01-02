@@ -234,7 +234,7 @@ function parseLLMFile(filePath) {
     // For requests, only keep important fields
     if (type === 'request') {
       const filteredData = {};
-      const importantFields = ['model', 'messages', 'tools', 'system'];
+      const importantFields = ['model', 'messages', 'tools', 'system', 'thinking'];
 
       importantFields.forEach(field => {
         if (data[field] !== undefined) {
@@ -1492,9 +1492,14 @@ function getClientJS() {
           if (level === swimlaneLevel) {
             // This trace belongs to this swimlane
             const eventClass = trace.type === 'response' ? 'event response' : 'event';
-            const metaInfo = trace.type === 'request' && trace.data.model
-              ? formatModelName(trace.data.model)
-              : '';
+            let metaInfo = '';
+            if (trace.type === 'request' && trace.data.model) {
+              metaInfo = formatModelName(trace.data.model);
+              // Add "/thinking" suffix if request has thinking enabled
+              if (trace.data.thinking && trace.data.thinking.type === 'enabled') {
+                metaInfo += '/thinking';
+              }
+            }
 
             html += '<div class="' + eventClass + '">';
             html += '<div class="event-header">';
