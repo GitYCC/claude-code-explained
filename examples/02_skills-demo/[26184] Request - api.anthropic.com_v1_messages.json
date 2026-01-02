@@ -1,0 +1,30 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Command: pip3 install --break-system-packages Pillow python-pptx\nOutput: Collecting Pillow\n  Downloading pillow-12.1.0-cp314-cp314-macosx_11_0_arm64.whl.metadata (8.8 kB)\nCollecting python-pptx\n  Downloading python_pptx-1.0.2-py3-none-any.whl.metadata (2.5 kB)\nCollecting XlsxWriter>=0.5.7 (from python-pptx)\n  Downloading xlsxwriter-3.2.9-py3-none-any.whl.metadata (2.7 kB)\nCollecting lxml>=3.1.0 (from python-pptx)\n  Downloading lxml-6.0.2-cp314-cp314-macosx_10_13_universal2.whl.metadata (3.6 kB)\nCollecting typing-extensions>=4.9.0 (from python-pptx)\n  Downloading typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)\nDownloading pillow-12.1.0-cp314-cp314-macosx_11_0_arm64.whl (4.7 MB)\n   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.7/4.7 MB 742.6 kB/s  0:00:06\nDownloading python_pptx-1.0.2-py3-none-any.whl (472 kB)\nDownloading lxml-6.0.2-cp314-cp314-macosx_10_13_universal2.whl (8.7 MB)\n   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 8.7/8.7 MB 1.1 MB/s  0:00:08\nDownloading typing_extensions-4.15.0-py3-none-any.whl (44 kB)\nDownloading xlsxwriter-3.2.9-py3-none-any.whl (175 kB)\nInstalling collected packages: XlsxWriter, typing-extensions, Pillow, lxml, python-pptx\n\nSuccessfully installed Pillow-12.1.0 XlsxWriter-3.2.9 lxml-6.0.2 python-pptx-1.0.2 typing-extensions-4.15.0\n\n"
+        }
+      ]
+    }
+  ],
+  "system": [
+    {
+      "type": "text",
+      "text": "You are Claude Code, Anthropic's official CLI for Claude."
+    },
+    {
+      "type": "text",
+      "text": "Extract any file paths that this command reads or modifies. For commands like \"git diff\" and \"cat\", include the paths of files being shown. Use paths verbatim -- don't add any slashes or try to resolve them. Do not try to infer paths that were not explicitly listed in the command output.\n\nIMPORTANT: Commands that do not display the contents of the files should not return any filepaths. For eg. \"ls\", pwd\", \"find\". Even more complicated commands that don't display the contents should not be considered: eg \"find . -type f -exec ls -la {} + | sort -k5 -nr | head -5\"\n\nFirst, determine if the command displays the contents of the files. If it does, then <is_displaying_contents> tag should be true. If it does not, then <is_displaying_contents> tag should be false.\n\nFormat your response as:\n<is_displaying_contents>\ntrue\n</is_displaying_contents>\n\n<filepaths>\npath/to/file1\npath/to/file2\n</filepaths>\n\nIf no files are read or modified, return empty filepaths tags:\n<filepaths>\n</filepaths>\n\nDo not include any other text in your response."
+    }
+  ],
+  "tools": [],
+  "metadata": {
+    "user_id": "user_f7c53f685190e59f3f0cd72d0a5d8319cb9bf916993925befd145ade71b437ee_account_8ff4589b-cbbd-4b15-b273-e4f718549c63_session_52110c2f-4e97-42c3-b9d1-408760ea90d6"
+  },
+  "max_tokens": 32000,
+  "stream": true
+}

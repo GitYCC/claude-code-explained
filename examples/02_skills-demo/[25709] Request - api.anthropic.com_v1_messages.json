@@ -1,0 +1,30 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Command: node create-presentation.js\nOutput: \nError: slide3.html: Multiple validation errors found:\n  1. HTML content overflows body by 27.0pt vertically (Remember: leave 0.5\" margin at bottom of slide)\n  2. Text box \"Superposition\" ends too close to bottom edge (0.24\" from bottom, minimum 0.5\" required)\n  3. Text box \"Quantum systems can exist in multiple states simul...\" ends too close to bottom edge (-0.14\" from bottom, minimum 0.5\" required)\n    at html2pptx (/Users/YC/Workspace/claude-code-try-skill/.claude/skills/pptx/scripts/html2pptx.js:973:13)\n    at async createPresentation (/Users/YC/Workspace/claude-code-try-skill/create-presentation.js:17:5)\n"
+        }
+      ]
+    }
+  ],
+  "system": [
+    {
+      "type": "text",
+      "text": "You are Claude Code, Anthropic's official CLI for Claude."
+    },
+    {
+      "type": "text",
+      "text": "Extract any file paths that this command reads or modifies. For commands like \"git diff\" and \"cat\", include the paths of files being shown. Use paths verbatim -- don't add any slashes or try to resolve them. Do not try to infer paths that were not explicitly listed in the command output.\n\nIMPORTANT: Commands that do not display the contents of the files should not return any filepaths. For eg. \"ls\", pwd\", \"find\". Even more complicated commands that don't display the contents should not be considered: eg \"find . -type f -exec ls -la {} + | sort -k5 -nr | head -5\"\n\nFirst, determine if the command displays the contents of the files. If it does, then <is_displaying_contents> tag should be true. If it does not, then <is_displaying_contents> tag should be false.\n\nFormat your response as:\n<is_displaying_contents>\ntrue\n</is_displaying_contents>\n\n<filepaths>\npath/to/file1\npath/to/file2\n</filepaths>\n\nIf no files are read or modified, return empty filepaths tags:\n<filepaths>\n</filepaths>\n\nDo not include any other text in your response."
+    }
+  ],
+  "tools": [],
+  "metadata": {
+    "user_id": "user_f7c53f685190e59f3f0cd72d0a5d8319cb9bf916993925befd145ade71b437ee_account_8ff4589b-cbbd-4b15-b273-e4f718549c63_session_52110c2f-4e97-42c3-b9d1-408760ea90d6"
+  },
+  "max_tokens": 32000,
+  "stream": true
+}

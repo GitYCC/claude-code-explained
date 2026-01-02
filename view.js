@@ -40,10 +40,12 @@ function loadSystemPrompts() {
     const filePath = path.join(promptsDir, file);
     const content = fs.readFileSync(filePath, 'utf-8');
 
-    // Extract name from filename: system-identity.md -> Identity
+    // Extract name from filename: system-identity.md -> Identity, user-prompt-suggestion.md -> Prompt-Suggestion
     let name = file.replace(/\.md$/, '');
     if (name.startsWith('system-')) {
       name = name.substring(7); // Remove 'system-' prefix
+    } else if (name.startsWith('user-')) {
+      name = name.substring(5); // Remove 'user-' prefix
     }
     // Capitalize first letter
     name = name.split('-').map(word =>
@@ -271,17 +273,7 @@ function parseExample(exampleId) {
     cliLog = fs.readFileSync(cliLogPath, 'utf-8');
   }
 
-  // Read level JSON if exists (examples/XX_name_level.json)
-  const levelPath = path.join(__dirname, 'examples', `${exampleId}_level.json`);
-  let levels = { main: [], 'second-rank': [] };
-  if (fs.existsSync(levelPath)) {
-    try {
-      const content = fs.readFileSync(levelPath, 'utf-8');
-      levels = JSON.parse(content);
-    } catch (e) {
-      console.error(`Failed to parse level JSON: ${e.message}`);
-    }
-  }
+  // No longer using level JSON files - levels are determined by system prompt content
 
   // Read all files from example directory that match API trace pattern
   const llmFiles = fs.readdirSync(exampleDir)
@@ -298,8 +290,7 @@ function parseExample(exampleId) {
   return {
     id: exampleId,
     llmTraces,
-    cliLog,
-    levels
+    cliLog
   };
 }
 
@@ -760,6 +751,37 @@ function getClientJS() {
     }
 
     /**
+     * Determine trace level based on system prompt content
+     * Returns 'main' if contains Analyze-Topic or Interactive-Cli
+     * Returns 'second' if contains Explore-Agent
+     * Returns 'third' otherwise
+     */
+    function determineTraceLevel(trace, systemPrompts) {
+      if (trace.type !== 'request' || !trace.data.system) {
+        return 'third';
+      }
+
+      const systemData = trace.data.system;
+      const systemItems = Array.isArray(systemData) ? systemData : [systemData];
+
+      for (const item of systemItems) {
+        const matchedPromptName = matchSystemPrompt(item, systemPrompts);
+
+        if (matchedPromptName) {
+          // Check if matched prompt name contains specific keywords
+          if (matchedPromptName.includes('Analyze-Topic') || matchedPromptName.includes('Interactive-Cli')) {
+            return 'main';
+          }
+          if (matchedPromptName.includes('Explore-Agent')) {
+            return 'second';
+          }
+        }
+      }
+
+      return 'third';
+    }
+
+    /**
      * Try to match system content against known prompt templates
      * Returns the prompt name if matched, null otherwise
      */
@@ -812,6 +834,31 @@ function getClientJS() {
         hash = hash & hash;
       }
       return Math.abs(hash).toString(36).substring(0, 6);
+    }
+
+    /**
+     * Extract hashable content from a content item
+     * For text-based content, extract the actual text rather than the whole object
+     */
+    function getHashableContent(contentItem) {
+      if (typeof contentItem === 'string') {
+        return contentItem;
+      }
+
+      if (contentItem && typeof contentItem === 'object') {
+        // For text type, use the text field
+        if (contentItem.type === 'text' && contentItem.text) {
+          return contentItem.text;
+        }
+        // For thinking type, use the thinking field
+        if (contentItem.type === 'thinking' && contentItem.thinking) {
+          return contentItem.thinking;
+        }
+        // For tool_use and tool_result, use full object (need id/tool_use_id)
+        // For other types, use full JSON
+      }
+
+      return JSON.stringify(contentItem);
     }
 
     function formatBlockType(type) {
@@ -932,10 +979,10 @@ function getClientJS() {
           const isContentArray = Array.isArray(msg.content);
           if (isContentArray && msg.content.length > 0) {
             msg.content.forEach(contentItem => {
-              hashes.push(simpleHash(JSON.stringify(contentItem)));
+              hashes.push(simpleHash(getHashableContent(contentItem)));
             });
           } else {
-            hashes.push(simpleHash(JSON.stringify(msg)));
+            hashes.push(simpleHash(getHashableContent(msg.content)));
           }
         });
       }
@@ -961,6 +1008,7 @@ function getClientJS() {
 
     /**
      * Group consecutive continued blocks and generate final HTML
+     * Only collapse continued blocks if they form a complete prefix (start from index 0)
      */
     function groupAndRenderBlocks(blocks) {
       let html = '';
@@ -977,17 +1025,27 @@ function getClientJS() {
           const groupEnd = i;
           const groupSize = groupEnd - groupStart;
 
-          // Generate collapsed block
-          const collapseId = 'collapse-' + Date.now() + '-' + collapseGroupId++;
-          html += '<div id="collapse-header-' + collapseId + '" class="collapsed-blocks" onclick="toggleCollapsedBlocks(\\'' + collapseId + '\\')">';
-          html += '<span class="arrow">▶</span>';
-          html += '<span>' + groupSize + ' continued from above</span>';
-          html += '</div>';
-          html += '<div id="collapse-content-' + collapseId + '" class="collapsed-content">';
-          for (let j = groupStart; j < groupEnd; j++) {
-            html += blocks[j].html;
+          // Only create collapsed block if this group starts from the beginning (complete prefix)
+          if (groupStart === 0) {
+            // Generate collapsed block (keep continued class for opacity)
+            const collapseId = 'collapse-' + Date.now() + '-' + collapseGroupId++;
+            html += '<div id="collapse-header-' + collapseId + '" class="collapsed-blocks" onclick="toggleCollapsedBlocks(\\'' + collapseId + '\\')">';
+            html += '<span class="arrow">▶</span>';
+            html += '<span>' + groupSize + ' continued from above</span>';
+            html += '</div>';
+            html += '<div id="collapse-content-' + collapseId + '" class="collapsed-content">';
+            for (let j = groupStart; j < groupEnd; j++) {
+              html += blocks[j].html;
+            }
+            html += '</div>';
+          } else {
+            // If not a complete prefix, render blocks normally and remove 'continued' class
+            for (let j = groupStart; j < groupEnd; j++) {
+              // Remove 'continued' class from HTML
+              const blockHtml = blocks[j].html.replace(/ continued/g, '');
+              html += blockHtml;
+            }
           }
-          html += '</div>';
         } else {
           // Regular block
           html += blocks[i].html;
@@ -998,7 +1056,7 @@ function getClientJS() {
       return html;
     }
 
-    function renderBlocks(exampleId, trace, traceIdx, previousTrace, allTraces, currentLevel, levels) {
+    function renderBlocks(exampleId, trace, traceIdx, previousTrace, allTraces, currentLevel, traceLevels, systemPrompts) {
       const blocks = []; // Collect all blocks here
       let blockIdx = 0;
       let continuedBlockCount = 0;
@@ -1041,7 +1099,7 @@ function getClientJS() {
               if (item.type === 'tool_use' && item.id) {
                 previousResponseToolUseIds.add(item.id);
               } else {
-                const hash = simpleHash(JSON.stringify(item));
+                const hash = simpleHash(getHashableContent(item));
                 previousResponseHashes.add(hash);
               }
             });
@@ -1057,33 +1115,30 @@ function getClientJS() {
       }
 
       // Calculate how many blocks are continued from previous request
-      // Use level-based logic: main compares with previous main, second-rank compares with previous second-rank
-      if (trace.type === 'request' && allTraces && levels) {
-        const mainSet = new Set(levels.main || []);
-        const secondRankSet = new Set(levels['second-rank'] || []);
-
+      // Use level-based logic: main compares with previous main, second compares with previous second
+      if (trace.type === 'request' && allTraces && traceLevels) {
         // Find the appropriate previous trace based on current level
         let compareWithTrace = null;
 
         if (currentLevel === 'main') {
           // For main level, find previous main request
           for (let i = traceIdx - 1; i >= 0; i--) {
-            if (allTraces[i].type === 'request' && mainSet.has(allTraces[i].timestamp)) {
+            if (allTraces[i].type === 'request' && traceLevels[i] === 'main') {
               compareWithTrace = allTraces[i];
               break;
             }
           }
         } else if (currentLevel === 'second') {
-          // For second-rank level, find previous second-rank request
+          // For second level, find previous second request
           // But only if not interrupted by a main request
           for (let i = traceIdx - 1; i >= 0; i--) {
             const t = allTraces[i];
             if (t.type === 'request') {
-              if (mainSet.has(t.timestamp)) {
+              if (traceLevels[i] === 'main') {
                 // Found a main request in between, stop searching
                 break;
-              } else if (secondRankSet.has(t.timestamp)) {
-                // Found a second-rank request
+              } else if (traceLevels[i] === 'second') {
+                // Found a second request
                 compareWithTrace = t;
                 break;
               }
@@ -1186,7 +1241,7 @@ function getClientJS() {
               // Split into multiple blocks, one for each content element
               msg.content.forEach((contentItem, contentIdx) => {
                 const blockId = 'trace' + traceIdx + '-block' + blockIdx;
-                const contentHash = simpleHash(JSON.stringify(contentItem));
+                const contentHash = simpleHash(getHashableContent(contentItem));
 
                 // Determine block type based on content item type
                 let blockType = role;
@@ -1217,7 +1272,18 @@ function getClientJS() {
                   displayId = 'Think-' + contentHash.substring(0, 4).toUpperCase();
                 } else if (contentItem.type === 'text') {
                   blockType = role;
-                  displayId = contentHash.substring(0, 4).toUpperCase();
+                  // Try to match user text content with prompt files
+                  if (role === 'user' && contentItem.text) {
+                    const prompts = systemPromptsCache[exampleId] || {};
+                    const matchedPromptName = matchSystemPrompt(contentItem, prompts);
+                    if (matchedPromptName) {
+                      displayId = matchedPromptName;
+                    } else {
+                      displayId = contentHash.substring(0, 4).toUpperCase();
+                    }
+                  } else {
+                    displayId = contentHash.substring(0, 4).toUpperCase();
+                  }
                 } else {
                   // For other types, use first 4 chars of hash in uppercase
                   displayId = contentHash.substring(0, 4).toUpperCase();
@@ -1248,7 +1314,7 @@ function getClientJS() {
               });
             } else {
               // Single content block (string or single object)
-              const msgHash = simpleHash(JSON.stringify(msg));
+              const msgHash = simpleHash(getHashableContent(msg.content));
               const displayId = msgHash.substring(0, 4).toUpperCase();
               const blockId = 'trace' + traceIdx + '-block' + blockIdx;
 
@@ -1277,7 +1343,7 @@ function getClientJS() {
         if (trace.data.content && Array.isArray(trace.data.content)) {
           trace.data.content.forEach((contentItem, contentIdx) => {
             const blockId = 'trace' + traceIdx + '-block' + blockIdx;
-            const contentHash = simpleHash(JSON.stringify(contentItem));
+            const contentHash = simpleHash(getHashableContent(contentItem));
             let blockType = contentItem.type || 'text';
             let displayId = '';
 
@@ -1347,34 +1413,20 @@ function getClientJS() {
 
       html += '<div class="timeline">';
 
-      // Build level sets for faster lookup
-      const mainSet = new Set(data.levels?.main || []);
-      const secondRankSet = new Set(data.levels?.['second-rank'] || []);
-
-      // Prepare trace levels for all traces
+      // Prepare trace levels for all traces based on system prompt content
       const traceLevels = [];
       data.llmTraces.forEach((trace, idx) => {
         // Determine the level of this trace
-        let level = 'main'; // default to main
+        let level = 'third'; // default to third
+
         if (trace.type === 'request') {
-          if (mainSet.has(trace.timestamp)) {
-            level = 'main';
-          } else if (secondRankSet.has(trace.timestamp)) {
-            level = 'second';
-          } else {
-            level = 'third';
-          }
+          // Determine level based on system prompt content
+          level = determineTraceLevel(trace, systemPromptsCache[exampleId] || {});
         } else if (trace.type === 'response') {
-          // For response, check the level of the previous request
+          // For response, use the level of the previous request
           for (let i = idx - 1; i >= 0; i--) {
             if (data.llmTraces[i].type === 'request') {
-              if (mainSet.has(data.llmTraces[i].timestamp)) {
-                level = 'main';
-              } else if (secondRankSet.has(data.llmTraces[i].timestamp)) {
-                level = 'second';
-              } else {
-                level = 'third';
-              }
+              level = traceLevels[i]; // Use already determined level
               break;
             }
           }
@@ -1426,12 +1478,12 @@ function getClientJS() {
               }
 
               html += '<div class="blocks-container">';
-              html += renderBlocks(exampleId, trace, idx, previousRequestTrace, data.llmTraces, level, data.levels);
+              html += renderBlocks(exampleId, trace, idx, previousRequestTrace, data.llmTraces, level, traceLevels, systemPromptsCache[exampleId] || {});
               html += '</div>';
             } else {
               // For responses, also render as blocks
               html += '<div class="blocks-container">';
-              html += renderBlocks(exampleId, trace, idx, null, data.llmTraces, level, data.levels);
+              html += renderBlocks(exampleId, trace, idx, null, data.llmTraces, level, traceLevels, systemPromptsCache[exampleId] || {});
               html += '</div>';
             }
 
