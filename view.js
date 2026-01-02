@@ -949,7 +949,7 @@ function getClientJS() {
       }
 
       // Show detail panel
-      detailPanel.innerHTML = '<h3>' + formatBlockType(blockData.type) + '-' + displayId + '</h3>' + renderDetailContent(blockData.content);
+      detailPanel.innerHTML = '<h3>' + formatBlockType(blockData.type) + '/' + displayId + '</h3>' + renderDetailContent(blockData.content);
     }
 
     // Generate hash sequence for a request trace to compare with previous requests
@@ -1194,7 +1194,7 @@ function getClientJS() {
             const continuedClass = isContinued ? ' continued' : '';
 
             let blockHtml = '<div id="block-' + exampleId + '-' + blockId + '" class="block system' + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
-            blockHtml += 'System-' + displayId;
+            blockHtml += 'System/' + displayId;
             blockHtml += '</div>';
 
             blocks.push({ html: blockHtml, isContinued: isContinued });
@@ -1221,7 +1221,7 @@ function getClientJS() {
             const continuedClass = isContinued ? ' continued' : '';
 
             let blockHtml = '<div id="block-' + exampleId + '-' + blockId + '" class="block tool' + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
-            blockHtml += 'Tool-' + toolName;
+            blockHtml += 'Tool/' + toolName;
             blockHtml += '</div>';
 
             blocks.push({ html: blockHtml, isContinued: isContinued });
@@ -1306,7 +1306,7 @@ function getClientJS() {
                 const continuedClass = isContinued ? ' continued' : '';
 
                 let blockHtml = '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + blockType + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
-                blockHtml += formatBlockType(blockType) + '-' + displayId;
+                blockHtml += formatBlockType(blockType) + '/' + displayId;
                 blockHtml += '</div>';
 
                 blocks.push({ html: blockHtml, isContinued: isContinued });
@@ -1330,7 +1330,7 @@ function getClientJS() {
               const continuedClass = isContinued ? ' continued' : '';
 
               let blockHtml = '<div id="block-' + exampleId + '-' + blockId + '" class="block ' + role + continuedClass + '" onclick="showBlockDetail(\\'' + exampleId + '\\', \\'' + blockId + '\\')">';
-              blockHtml += formatBlockType(role) + '-' + displayId;
+              blockHtml += formatBlockType(role) + '/' + displayId;
               blockHtml += '</div>';
 
               blocks.push({ html: blockHtml, isContinued: isContinued });
@@ -1373,7 +1373,7 @@ function getClientJS() {
             };
 
             let blockHtml = '<div id=\"block-' + exampleId + '-' + blockId + '\" class=\"block ' + blockType + '\" onclick=\"showBlockDetail(\\\'' + exampleId + '\\\', \\\'' + blockId + '\\\')\">';
-            blockHtml += formatBlockType(blockType) + '-' + displayId;
+            blockHtml += formatBlockType(blockType) + '/' + displayId;
             blockHtml += '</div>';
 
             blocks.push({ html: blockHtml, isContinued: false });
