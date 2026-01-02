@@ -972,7 +972,7 @@ function getClientJS() {
       // Show detail panel
       let titleHtml = '<h3>' + formatBlockType(blockData.type) + '/' + displayId;
       if (blockData.githubUrl) {
-        titleHtml += ' <a href="' + blockData.githubUrl + '" target="_blank" style="font-size: 0.8em; color: #858585; text-decoration: none; margin-left: 8px;">View this Prompt</a>';
+        titleHtml += ' <a href="' + blockData.githubUrl + '" target="_blank" style="font-size: 0.8em; color: #0969da; text-decoration: underline; margin-left: 8px; cursor: pointer;">View this Prompt on Github</a>';
       }
       titleHtml += '</h3>';
       detailPanel.innerHTML = titleHtml + renderDetailContent(blockData.content);
@@ -1238,7 +1238,7 @@ function getClientJS() {
             const blockId = 'trace' + traceIdx + '-block' + blockIdx;
 
             // Generate GitHub URL for tool definition
-            const githubUrl = `https://github.com/GitYCC/claude-code-explained/blob/main/prompts/tool/${toolName.toLowerCase().replace(/_/g, '-')}.md`;
+            const githubUrl = 'https://github.com/GitYCC/claude-code-explained/blob/main/prompts/tool/' + toolName.toLowerCase().replace(/_/g, '-') + '.md';
 
             blockDataStore[exampleId + '-' + blockId] = {
               type: 'tool',
