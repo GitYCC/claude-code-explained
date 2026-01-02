@@ -24,7 +24,7 @@ function scanExamples() {
 }
 
 /**
- * Load system prompt templates from prompts directory
+ * Load system prompt templates from prompts directory (recursive)
  */
 function loadSystemPrompts() {
   const promptsDir = path.join(__dirname, 'prompts');
@@ -34,27 +34,39 @@ function loadSystemPrompts() {
   }
 
   const prompts = {};
-  const files = fs.readdirSync(promptsDir).filter(f => f.endsWith('.md'));
 
-  for (const file of files) {
-    const filePath = path.join(promptsDir, file);
-    const content = fs.readFileSync(filePath, 'utf-8');
+  // Recursively scan subdirectories (system, user, etc.)
+  const scanDir = (dir, subdir = '') => {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
 
-    // Extract name from filename: system-identity.md -> Identity, user-prompt-suggestion.md -> Prompt-Suggestion
-    let name = file.replace(/\.md$/, '');
-    if (name.startsWith('system-')) {
-      name = name.substring(7); // Remove 'system-' prefix
-    } else if (name.startsWith('user-')) {
-      name = name.substring(5); // Remove 'user-' prefix
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        // Recursively scan subdirectories
+        scanDir(fullPath, entry.name);
+      } else if (entry.name.endsWith('.md')) {
+        const content = fs.readFileSync(fullPath, 'utf-8');
+
+        // Extract name from filename: analyze-topic.md -> Analyze-Topic
+        let name = entry.name.replace(/\.md$/, '');
+        name = name.split('-').map(word =>
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join('-');
+
+        // Construct relative path for GitHub URL
+        const relPath = subdir ? `${subdir}/${entry.name}` : entry.name;
+
+        prompts[name] = {
+          content: content,
+          file: entry.name,
+          githubUrl: `https://github.com/GitYCC/claude-code-explained/blob/main/prompts/${relPath}`
+        };
+      }
     }
-    // Capitalize first letter
-    name = name.split('-').map(word =>
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join('-');
+  };
 
-    prompts[name] = content;
-  }
-
+  scanDir(promptsDir);
   return prompts;
 }
 
@@ -765,9 +777,10 @@ function getClientJS() {
       const systemItems = Array.isArray(systemData) ? systemData : [systemData];
 
       for (const item of systemItems) {
-        const matchedPromptName = matchSystemPrompt(item, systemPrompts);
+        const matchResult = matchSystemPrompt(item, systemPrompts);
 
-        if (matchedPromptName) {
+        if (matchResult) {
+          const matchedPromptName = matchResult.name;
           // Check if matched prompt name contains specific keywords
           if (matchedPromptName.includes('Analyze-Topic') || matchedPromptName.includes('Interactive-Cli')) {
             return 'main';
@@ -783,7 +796,7 @@ function getClientJS() {
 
     /**
      * Try to match system content against known prompt templates
-     * Returns the prompt name if matched, null otherwise
+     * Returns {name, githubUrl} if matched, null otherwise
      */
     function matchSystemPrompt(systemContent, systemPrompts) {
       // Extract text from system content
@@ -799,13 +812,18 @@ function getClientJS() {
 
       const normalizedContent = normalizeText(contentText);
 
-      for (const [name, template] of Object.entries(systemPrompts)) {
-        const normalizedTemplate = normalizeText(template);
+      for (const [name, promptData] of Object.entries(systemPrompts)) {
+        // Handle both old format (string) and new format (object with content)
+        const templateContent = typeof promptData === 'string' ? promptData : promptData.content;
+        const normalizedTemplate = normalizeText(templateContent);
 
         // Strategy 1: Try exact regex match first
         const regex = templateToRegex(normalizedTemplate);
         if (regex.test(normalizedContent)) {
-          return name;
+          return {
+            name: name,
+            githubUrl: typeof promptData === 'object' ? promptData.githubUrl : null
+          };
         }
 
         // Strategy 2: Try signature matching (for templates with many placeholders)
@@ -817,7 +835,10 @@ function getClientJS() {
           );
 
           if (allMatch) {
-            return name;
+            return {
+              name: name,
+              githubUrl: typeof promptData === 'object' ? promptData.githubUrl : null
+            };
           }
         }
       }
@@ -949,7 +970,12 @@ function getClientJS() {
       }
 
       // Show detail panel
-      detailPanel.innerHTML = '<h3>' + formatBlockType(blockData.type) + '/' + displayId + '</h3>' + renderDetailContent(blockData.content);
+      let titleHtml = '<h3>' + formatBlockType(blockData.type) + '/' + displayId;
+      if (blockData.githubUrl) {
+        titleHtml += ' <a href="' + blockData.githubUrl + '" target="_blank" style="font-size: 0.8em; color: #858585; text-decoration: none; margin-left: 8px;">View this Prompt</a>';
+      }
+      titleHtml += '</h3>';
+      detailPanel.innerHTML = titleHtml + renderDetailContent(blockData.content);
     }
 
     // Generate hash sequence for a request trace to compare with previous requests
@@ -1170,12 +1196,14 @@ function getClientJS() {
           systemItems.forEach(item => {
             // Try to match against known system prompts
             let displayId = '';
+            let githubUrl = null;
             const prompts = systemPromptsCache[exampleId] || {};
-            const matchedPromptName = matchSystemPrompt(item, prompts);
+            const matchResult = matchSystemPrompt(item, prompts);
 
             const itemHash = simpleHash(JSON.stringify(item));
-            if (matchedPromptName) {
-              displayId = matchedPromptName;
+            if (matchResult) {
+              displayId = matchResult.name;
+              githubUrl = matchResult.githubUrl;
             } else {
               displayId = itemHash.substring(0, 4).toUpperCase();
             }
@@ -1185,7 +1213,8 @@ function getClientJS() {
             blockDataStore[exampleId + '-' + blockId] = {
               type: 'system',
               content: item,
-              displayId: displayId
+              displayId: displayId,
+              githubUrl: githubUrl
             };
 
             const isContinuedFromPrefix = blockIdx < continuedBlockCount;
@@ -1208,10 +1237,14 @@ function getClientJS() {
             const toolName = tool.name || 'unknown';
             const blockId = 'trace' + traceIdx + '-block' + blockIdx;
 
+            // Generate GitHub URL for tool definition
+            const githubUrl = `https://github.com/GitYCC/claude-code-explained/blob/main/prompts/tool/${toolName.toLowerCase().replace(/_/g, '-')}.md`;
+
             blockDataStore[exampleId + '-' + blockId] = {
               type: 'tool',
               content: tool,
-              displayId: toolName
+              displayId: toolName,
+              githubUrl: githubUrl
             };
 
             const toolHash = simpleHash(JSON.stringify(tool));
@@ -1246,6 +1279,7 @@ function getClientJS() {
                 // Determine block type based on content item type
                 let blockType = role;
                 let displayId = '';
+                let githubUrl = null;
 
                 if (contentItem.type === 'tool_use') {
                   blockType = 'tool_use';
@@ -1275,9 +1309,10 @@ function getClientJS() {
                   // Try to match user text content with prompt files
                   if (role === 'user' && contentItem.text) {
                     const prompts = systemPromptsCache[exampleId] || {};
-                    const matchedPromptName = matchSystemPrompt(contentItem, prompts);
-                    if (matchedPromptName) {
-                      displayId = matchedPromptName;
+                    const matchResult = matchSystemPrompt(contentItem, prompts);
+                    if (matchResult) {
+                      displayId = matchResult.name;
+                      githubUrl = matchResult.githubUrl;
                     } else {
                       displayId = contentHash.substring(0, 4).toUpperCase();
                     }
@@ -1292,7 +1327,8 @@ function getClientJS() {
                 blockDataStore[exampleId + '-' + blockId] = {
                   type: blockType,
                   content: contentItem,
-                  displayId: displayId
+                  displayId: displayId,
+                  githubUrl: githubUrl
                 };
 
                 const isContinuedFromPrefix = blockIdx < continuedBlockCount;

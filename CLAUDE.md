@@ -18,6 +18,20 @@ claude-code-explained/
 │       └── llm/          # LLM API 請求/回應追蹤檔案
 │           ├── [timestamp] Request - api.anthropic.com_v1_messages.txt
 │           └── [timestamp] Response - api.anthropic.com_v1_messages.txt
+├── prompts/              # Claude Code 提示和工具定義
+│   ├── system/          # 系統級提示 (6 files)
+│   │   ├── analyze-topic.md
+│   │   ├── explore-agent.md
+│   │   ├── interactive-cli.md
+│   │   └── ... 其他系統提示
+│   ├── tool/            # Claude Code 工具定義 (18 files)
+│   │   ├── task.md
+│   │   ├── bash.md
+│   │   ├── read.md
+│   │   └── ... 其他工具
+│   └── user/            # 用戶級提示 (3 files)
+│       ├── prompt-suggestion.md
+│       └── ... 其他用戶提示
 └── CLAUDE.md             # 本檔案
 ```
 
@@ -26,6 +40,16 @@ claude-code-explained/
 - 範例目錄以數字前綴命名: `01_`, `02_`, `03_` 等
 - 目錄名稱應清楚描述使用情境,例如: `01_explain-this-repo-and-dump-to-contentmd`
 - 使用小寫字母和連字符 `-` 分隔單字
+
+### Prompts 目錄結構
+
+- `prompts/system/` - 存放系統級 Claude Code 提示模板（6個文件）
+- `prompts/tool/` - 存放 Claude Code 工具定義及使用說明（18個文件）
+  - 每個工具文件採用 YAML frontmatter 格式，包含 `name` 和 `input_schema`
+  - description 部分使用 markdown 格式撰寫
+- `prompts/user/` - 存放用戶級提示（如提醒、建議等，3個文件）
+- 文件命名使用小寫字母和連字符，例如: `interactive-cli.md`, `task.md`
+- 視覺化工具會自動遞迴掃描所有子目錄並在 LLM 追蹤中標記和匹配
 
 ## 新增範例的流程
 
