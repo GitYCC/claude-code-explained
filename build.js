@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { scanExamples, parseExample, getCSS, getClientJS, renderExampleSelector } = require('./view.js');
+const { scanExamples, parseExample, loadSystemPrompts, getCSS, getClientJS, renderExampleSelector } = require('./view.js');
 
 /**
  * Build static site from view.js dynamic content
@@ -74,11 +74,14 @@ function build() {
   const examples = scanExamples();
   console.log(`📂 Found ${examples.length} example(s)`);
 
+  // Load system prompts once
+  const systemPrompts = loadSystemPrompts();
+
   // Parse all example data
   const examplesData = {};
   examples.forEach(ex => {
     console.log(`   Processing: ${ex.id}`);
-    examplesData[ex.id] = parseExample(ex.id);
+    examplesData[ex.id] = { ...parseExample(ex.id), systemPrompts };
   });
 
   // Generate HTML
