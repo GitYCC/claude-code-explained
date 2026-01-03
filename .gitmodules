@@ -1,3 +1,3 @@
-[submodule "example_envirnments/01_explain-this-repo-and-dump-to-contentmd/TempDD"]
-	path = example_envirnments/01_explain-this-repo-and-dump-to-contentmd/TempDD
+[submodule "example_environments/01_explain-this-repo-and-dump-to-contentmd/TempDD"]
+	path = example_environments/01_explain-this-repo-and-dump-to-contentmd/TempDD
 	url = https://github.com/GitYCC/TempDD
