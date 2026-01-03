@@ -1,0 +1,11 @@
+# Gitleaks configuration for claude-code-explained
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist for known safe patterns"
+
+# Paths to exclude from scanning
+paths = [
+    '''\.git/''',
+]
