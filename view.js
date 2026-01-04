@@ -637,6 +637,134 @@ function getCSS() {
       border-bottom: 1px solid #3e3e42;
       padding-bottom: 10px;
     }
+
+    /* ============ Mobile Responsive Styles ============ */
+
+    /* Backdrop overlay for mobile drawer */
+    .detail-panel-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 998;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .detail-panel-backdrop.show {
+      display: block;
+      opacity: 1;
+    }
+
+    /* Mobile breakpoint: < 768px */
+    @media (max-width: 767px) {
+      /* Stack layout vertically */
+      .split-view {
+        flex-direction: column;
+      }
+
+      .blocks-panel {
+        flex: 1;
+        width: 100%;
+      }
+
+      /* Transform detail-panel into bottom drawer */
+      .detail-panel {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-height: 0; /* Hidden by default */
+        overflow: hidden;
+        z-index: 999;
+        border-radius: 16px 16px 0 0;
+        border: none;
+        border-top: 2px solid #4ec9b0;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+        transition: max-height 0.3s ease, padding 0.3s ease;
+        padding: 0;
+      }
+
+      /* Drawer open state */
+      .detail-panel.open {
+        max-height: 80vh;
+        padding: 20px 15px;
+        overflow: auto;
+      }
+
+      /* Drag indicator (top handle bar) */
+      .detail-panel::before {
+        content: '';
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40px;
+        height: 4px;
+        background: #858585;
+        border-radius: 2px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .detail-panel.open::before {
+        opacity: 1;
+      }
+
+      /* Adjust spacing for drag indicator */
+      .detail-panel.open h3:first-child {
+        margin-top: 20px;
+      }
+
+      /* Swimlane responsive scaling */
+      .swimlane-headers {
+        gap: 4px;
+      }
+
+      .swimlane-header {
+        padding: 6px 4px;
+        font-size: 9px;
+      }
+
+      .timeline-row {
+        gap: 4px;
+      }
+
+      .timeline-cell {
+        padding: 0 3px;
+      }
+
+      .event {
+        padding: 6px;
+        margin: 4px 0;
+        font-size: 11px;
+      }
+
+      .event-header {
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .event-title {
+        font-size: 11px;
+      }
+
+      .event-meta {
+        font-size: 0.75em;
+      }
+
+      .blocks-container {
+        gap: 4px;
+      }
+
+      .block {
+        padding: 6px 10px;
+        font-size: 0.8em;
+      }
+    }
   `;
 }
 
@@ -964,6 +1092,94 @@ function getClientJS() {
       return html;
     }
 
+    /**
+     * Check if current viewport is mobile (< 768px)
+     */
+    function isMobileView() {
+      return window.innerWidth < 768;
+    }
+
+    /**
+     * Open mobile drawer with backdrop
+     */
+    function openMobileDrawer(exampleId) {
+      const detailPanel = document.getElementById('detail-panel-' + exampleId);
+      let backdrop = document.getElementById('detail-panel-backdrop-' + exampleId);
+
+      if (!detailPanel) return;
+
+      // Create backdrop if not exists
+      if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.id = 'detail-panel-backdrop-' + exampleId;
+        backdrop.className = 'detail-panel-backdrop';
+        backdrop.onclick = () => closeMobileDrawer(exampleId);
+        document.body.appendChild(backdrop);
+      }
+
+      // Show backdrop and drawer (use RAF for smooth transition)
+      requestAnimationFrame(() => {
+        backdrop.classList.add('show');
+        detailPanel.classList.add('open');
+      });
+
+      // Prevent body scroll when drawer is open
+      document.body.style.overflow = 'hidden';
+    }
+
+    /**
+     * Close mobile drawer
+     */
+    function closeMobileDrawer(exampleId) {
+      const detailPanel = document.getElementById('detail-panel-' + exampleId);
+      const backdrop = document.getElementById('detail-panel-backdrop-' + exampleId);
+
+      if (detailPanel) {
+        detailPanel.classList.remove('open');
+      }
+
+      if (backdrop) {
+        backdrop.classList.remove('show');
+      }
+
+      // Restore body scroll
+      document.body.style.overflow = '';
+    }
+
+    /**
+     * Setup swipe-down gesture to close drawer
+     */
+    function setupDrawerSwipe(exampleId) {
+      const detailPanel = document.getElementById('detail-panel-' + exampleId);
+      if (!detailPanel) return;
+
+      let startY = 0;
+      let currentY = 0;
+
+      detailPanel.addEventListener('touchstart', (e) => {
+        startY = e.touches[0].clientY;
+      }, { passive: true });
+
+      detailPanel.addEventListener('touchmove', (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        // Only allow swipe down when scrolled to top
+        if (deltaY > 0 && detailPanel.scrollTop === 0) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      detailPanel.addEventListener('touchend', (e) => {
+        const deltaY = currentY - startY;
+
+        // Close if swiped down more than 100px from top
+        if (deltaY > 100 && detailPanel.scrollTop === 0) {
+          closeMobileDrawer(exampleId);
+        }
+      }, { passive: true });
+    }
+
     function showBlockDetail(exampleId, blockId) {
       const detailPanel = document.getElementById('detail-panel-' + exampleId);
       const blockData = blockDataStore[exampleId + '-' + blockId];
@@ -1004,6 +1220,11 @@ function getClientJS() {
       }
       titleHtml += '</h3>';
       detailPanel.innerHTML = titleHtml + renderDetailContent(blockData.content);
+
+      // ========== Mobile drawer logic ==========
+      if (isMobileView()) {
+        openMobileDrawer(exampleId);
+      }
     }
 
     // Generate hash sequence for a request trace to compare with previous requests
@@ -1660,6 +1881,24 @@ function getClientJS() {
       html += '</div>';
 
       detailDiv.innerHTML = html;
+
+      // ========== Mobile initialization ==========
+      // Setup swipe gesture for mobile drawer
+      if (isMobileView()) {
+        setupDrawerSwipe(exampleId);
+      }
+
+      // Handle window resize (desktop ↔ mobile switching)
+      let resizeTimer;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          // Close drawer when switching to desktop
+          if (!isMobileView()) {
+            closeMobileDrawer(exampleId);
+          }
+        }, 250);
+      });
     }
 
     // Auto-load first example on page load
