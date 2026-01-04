@@ -62,10 +62,10 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"/Use"}             }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"rs/yi-chang"}     }
+data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"rs/YC"}     }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"chen/"}     }
+data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"/"}     }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"Wor"}        }
@@ -119,13 +119,13 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"/User"}  }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"s/yi-chan"}            }
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"s/YC"}            }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"gch"}        }
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":""}        }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"en/"}   }
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"/"}   }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"Works"}         }
@@ -167,13 +167,13 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"/Us"}              }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"ers/yi-c"} }
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"ers/YC"} }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"hangch"}   }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"en/Workspac"}          }
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"/Workspac"}          }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"e/Te"}              }

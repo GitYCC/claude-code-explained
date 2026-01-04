@@ -50,13 +50,13 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"th\": \"/Users"}   }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"/yi-c"}            }
+data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"/YC"}            }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"hangch"}       }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"en/Works"}   }
+data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"/Works"}   }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"pace/Tem"}              }
@@ -101,13 +101,13 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"\"cd /"}   }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"Users/yi-ch"}   }
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"Users/YC"}   }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"an"}             }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"gchen/Worksp"}   }
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"/Worksp"}   }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"ace/Te"}               }
@@ -185,7 +185,7 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"angc"} }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"hen/Works"}         }
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"/Works"}         }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"pace"}             }

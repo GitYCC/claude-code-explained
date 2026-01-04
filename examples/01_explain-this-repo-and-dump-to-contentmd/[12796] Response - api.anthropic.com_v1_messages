@@ -110,7 +110,7 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"changch"}              }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"en/Work"}         }
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"/Work"}         }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"space/Tem"}      }

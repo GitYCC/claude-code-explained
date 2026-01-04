@@ -1,0 +1,1 @@
+<local-command-stdout>{{STDOUT}}</local-command-stdout>

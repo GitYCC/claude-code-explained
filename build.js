@@ -33,7 +33,7 @@ function getClientJSStatic(examplesData) {
 
   return `
     // Embedded example data
-    const EXAMPLES_DATA = ${JSON.stringify(examplesData, null, 2)};
+    const EXAMPLES_DATA = ${JSON.stringify(examplesData, null, 2).replace(/<\/script>/gi, '<\\/script>').replace(/<\/style>/gi, '<\\/style>')};
 
 ${staticJS}
   `;

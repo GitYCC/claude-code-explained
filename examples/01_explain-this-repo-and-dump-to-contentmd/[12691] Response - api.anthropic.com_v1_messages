@@ -131,7 +131,7 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"a /Us"}       }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"ers/yi-ch"}            }
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"ers/YC"}            }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"angchen"}   }
@@ -191,7 +191,7 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"changc"}           }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"hen/Workspa"}             }
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"/Workspa"}             }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"ce/Temp"}  }

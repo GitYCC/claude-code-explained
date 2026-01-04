@@ -62,10 +62,10 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"ers/"}           }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"yi-changch"}             }
+data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"YC"}             }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"en/Wo"}  }
+data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"/Wo"}  }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"rkspace"}        }
@@ -170,10 +170,10 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"sers"}  }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"/yi-changch"}             }
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"/YC"}             }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"en/Works"}               }
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"/Works"}               }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"pace/Te"}           }

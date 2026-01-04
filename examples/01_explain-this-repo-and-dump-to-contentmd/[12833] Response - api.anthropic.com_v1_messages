@@ -104,7 +104,7 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"rs/"}         }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"yi-c"}}
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"YC"}}
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"hangchen/Wo"}          }
@@ -170,10 +170,10 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"/yi"}      }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"-changche"}          }
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":""}          }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"n/Work"}}
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"/Work"}}
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"space/Temp"} }

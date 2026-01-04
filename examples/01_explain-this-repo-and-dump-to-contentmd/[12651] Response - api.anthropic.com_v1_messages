@@ -86,10 +86,10 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"th\": \"/User"}}
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"s/yi-changch"}       }
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"s/Y"}       }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"en"}    }
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"C"}    }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"/Workspace/"}               }
@@ -122,10 +122,10 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"th\": \"/Users"}           }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"/yi-changche"}  }
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"/YC"}  }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"n/Work"}           }
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"/Work"}           }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"space/Temp"}         }

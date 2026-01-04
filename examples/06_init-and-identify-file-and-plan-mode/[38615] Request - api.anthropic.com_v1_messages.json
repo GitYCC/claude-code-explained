@@ -1,0 +1,30 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Command: ls -lR /Users/YC/Workspace/06_plan-mode\nOutput: total 32\n-rw-------@ 1 YC  staff   780  1月  4 00:25 CLAUDE.md\n-rw-r--r--  1 YC  staff  5678  1月  4 00:20 demo.md\n-rwxr-xr-x  1 YC  staff   191  1月  4 00:20 run.sh\n\n"
+        }
+      ]
+    }
+  ],
+  "system": [
+    {
+      "type": "text",
+      "text": "You are Claude Code, Anthropic's official CLI for Claude."
+    },
+    {
+      "type": "text",
+      "text": "Extract any file paths that this command reads or modifies. For commands like \"git diff\" and \"cat\", include the paths of files being shown. Use paths verbatim -- don't add any slashes or try to resolve them. Do not try to infer paths that were not explicitly listed in the command output.\n\nIMPORTANT: Commands that do not display the contents of the files should not return any filepaths. For eg. \"ls\", pwd\", \"find\". Even more complicated commands that don't display the contents should not be considered: eg \"find . -type f -exec ls -la {} + | sort -k5 -nr | head -5\"\n\nFirst, determine if the command displays the contents of the files. If it does, then <is_displaying_contents> tag should be true. If it does not, then <is_displaying_contents> tag should be false.\n\nFormat your response as:\n<is_displaying_contents>\ntrue\n</is_displaying_contents>\n\n<filepaths>\npath/to/file1\npath/to/file2\n</filepaths>\n\nIf no files are read or modified, return empty filepaths tags:\n<filepaths>\n</filepaths>\n\nDo not include any other text in your response."
+    }
+  ],
+  "tools": [],
+  "metadata": {
+    "user_id": "user_f7c53f685190e59f3f0cd72d0a5d8319cb9bf916993925befd145ade71b437ee_account_4c3bcb02-4afd-4048-9f34-a4477aa92825_session_bc96d010-f28c-4ea8-80a6-c85ab7cf3821"
+  },
+  "max_tokens": 32000,
+  "stream": true
+}

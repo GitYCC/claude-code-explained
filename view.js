@@ -165,11 +165,29 @@ function parseSSEResponse(bodyContent) {
       } else if (delta.type === 'thinking_delta') {
         contentBlocks[index].thinking = (contentBlocks[index].thinking || '') + delta.thinking;
       } else if (delta.type === 'input_json_delta') {
+        // Handle input: if it's an object (from content_block_start), convert to empty string
+        if (typeof contentBlocks[index].input === 'object') {
+          contentBlocks[index].input = '';
+        }
         contentBlocks[index].input = (contentBlocks[index].input || '') + delta.partial_json;
       }
     } else if (event.type === 'content_block_stop') {
       // Content block is complete
-      // No additional action needed
+      // Parse input JSON string to object if needed
+      const index = event.data.index;
+      if (contentBlocks[index] && typeof contentBlocks[index].input === 'string' && contentBlocks[index].input.trim() !== '') {
+        try {
+          contentBlocks[index].input = JSON.parse(contentBlocks[index].input);
+        } catch (e) {
+          // Keep as string if parsing fails (but don't warn for empty strings)
+          if (contentBlocks[index].input.trim() !== '') {
+            console.warn('Failed to parse tool input JSON for block', index, ':', e.message);
+          }
+        }
+      } else if (contentBlocks[index] && typeof contentBlocks[index].input === 'string' && contentBlocks[index].input.trim() === '') {
+        // Empty string input should be empty object
+        contentBlocks[index].input = {};
+      }
     } else if (event.type === 'message_delta') {
       // Update message-level fields
       if (event.data.delta) {
@@ -707,9 +725,19 @@ function getClientJS() {
           let endIdx = template.indexOf('}}', i + 2);
           if (endIdx !== -1) {
             // Replace placeholder with wildcard
+            // Make following single space optional to handle cases where
+            // placeholder replacement removes trailing whitespace
             pattern += '.*?';
             i = endIdx + 2;
             lastWasPlaceholder = true;
+
+            // If next character is a single space, make it optional
+            // This handles normalized newlines that become spaces
+            if (i < template.length && template[i] === ' ') {
+              pattern += ' ?';
+              i++;
+              lastWasPlaceholder = false;
+            }
             continue;
           }
         }
@@ -785,7 +813,7 @@ function getClientJS() {
           if (matchedPromptName.includes('Analyze-Topic') || matchedPromptName.includes('Interactive-Cli')) {
             return 'main';
           }
-          if (matchedPromptName.includes('Explore-Agent')) {
+          if (matchedPromptName.includes('-Agent')) {
             return 'second';
           }
         }
@@ -1109,6 +1137,10 @@ function getClientJS() {
               if (item.type === 'tool_use' && item.id && item.name) {
                 toolUseMap[item.id] = item.name;
               }
+              // Also collect server_tool_use
+              if (item.type === 'server_tool_use' && item.id && item.name) {
+                toolUseMap[item.id] = item.name;
+              }
             });
           }
         }
@@ -1123,6 +1155,8 @@ function getClientJS() {
           if (t.type === 'response' && t.data.content) {
             t.data.content.forEach(item => {
               if (item.type === 'tool_use' && item.id) {
+                previousResponseToolUseIds.add(item.id);
+              } else if (item.type === 'server_tool_use' && item.id) {
                 previousResponseToolUseIds.add(item.id);
               } else {
                 const hash = simpleHash(getHashableContent(item));
@@ -1375,41 +1409,119 @@ function getClientJS() {
           });
         }
       } else if (trace.type === 'response') {
-        // Render response content blocks (without continued detection)
+        // Render response content blocks with merging of consecutive same-type blocks
         if (trace.data.content && Array.isArray(trace.data.content)) {
-          trace.data.content.forEach((contentItem, contentIdx) => {
-            const blockId = 'trace' + traceIdx + '-block' + blockIdx;
-            const contentHash = simpleHash(getHashableContent(contentItem));
-            let blockType = contentItem.type || 'text';
-            let displayId = '';
+          // First, group consecutive blocks of the same type
+          const groups = [];
+          let currentGroup = null;
 
+          trace.data.content.forEach((contentItem, contentIdx) => {
+            let blockType = contentItem.type || 'text';
+
+            // Normalize block types for grouping
             if (contentItem.type === 'text') {
-              blockType = 'assistant';
-              displayId = contentHash.substring(0, 4).toUpperCase();
+              blockType = 'text';
             } else if (contentItem.type === 'thinking') {
-              blockType = 'assistant';
-              displayId = 'Think-' + contentHash.substring(0, 4).toUpperCase();
+              blockType = 'thinking';
             } else if (contentItem.type === 'tool_use') {
               blockType = 'tool_use';
-              const toolName = contentItem.name || 'unknown';
-              if (contentItem.id && contentItem.id.startsWith('toolu_')) {
-                const idPart = contentItem.id.substring(6);
+            } else if (contentItem.type === 'server_tool_use') {
+              blockType = 'server_tool_use';
+            } else if (contentItem.type === 'web_search_tool_result') {
+              blockType = 'web_search_tool_result';
+            }
+
+            // Don't merge tool_use blocks - each should be displayed separately
+            if (blockType === 'tool_use' || blockType === 'server_tool_use' || blockType === 'web_search_tool_result') {
+              // Create a new group for each tool block
+              currentGroup = { type: blockType, items: [contentItem], startIdx: contentIdx };
+              groups.push(currentGroup);
+            } else if (!currentGroup || currentGroup.type !== blockType) {
+              currentGroup = { type: blockType, items: [contentItem], startIdx: contentIdx };
+              groups.push(currentGroup);
+            } else {
+              currentGroup.items.push(contentItem);
+            }
+          });
+
+          // Now render each group
+          groups.forEach(group => {
+            const blockId = 'trace' + traceIdx + '-block' + blockIdx;
+            let renderBlockType = group.type;
+            let displayId = '';
+            let mergedContent = null;
+
+            // Determine display block type and ID
+            if (group.type === 'text') {
+              renderBlockType = 'assistant';
+              if (group.items.length > 1) {
+                // Merge all text items into a single text block
+                const mergedText = group.items.map(item => item.text || '').join('');
+                mergedContent = { type: 'text', text: mergedText };
+                const contentHash = simpleHash(mergedText);
+                displayId = contentHash.substring(0, 4).toUpperCase();
+              } else {
+                const contentHash = simpleHash(getHashableContent(group.items[0]));
+                displayId = contentHash.substring(0, 4).toUpperCase();
+                mergedContent = group.items[0];
+              }
+            } else if (group.type === 'thinking') {
+              renderBlockType = 'assistant';
+              if (group.items.length > 1) {
+                // Merge all thinking items into a single thinking block
+                const mergedThinking = group.items.map(item => item.thinking || '').join('');
+                mergedContent = { type: 'thinking', thinking: mergedThinking };
+                const contentHash = simpleHash(mergedThinking);
+                displayId = 'Think-' + contentHash.substring(0, 4).toUpperCase();
+              } else {
+                const contentHash = simpleHash(getHashableContent(group.items[0]));
+                displayId = 'Think-' + contentHash.substring(0, 4).toUpperCase();
+                mergedContent = group.items[0];
+              }
+            } else if (group.type === 'tool_use') {
+              renderBlockType = 'tool_use';
+              const toolName = group.items[0].name || 'unknown';
+              if (group.items[0].id && group.items[0].id.startsWith('toolu_')) {
+                const idPart = group.items[0].id.substring(6);
                 displayId = toolName + '-' + idPart.substring(0, 4).toUpperCase();
               } else {
                 displayId = toolName;
               }
+              mergedContent = group.items[0];
+            } else if (group.type === 'server_tool_use') {
+              renderBlockType = 'tool_use';
+              const toolName = group.items[0].name || 'unknown';
+              if (group.items[0].id && group.items[0].id.startsWith('srvtoolu_')) {
+                const idPart = group.items[0].id.substring(9);
+                displayId = toolName + '-' + idPart.substring(0, 4).toUpperCase();
+              } else {
+                displayId = toolName;
+              }
+              mergedContent = group.items[0];
+            } else if (group.type === 'web_search_tool_result') {
+              renderBlockType = 'tool_result';
+              const toolName = toolUseMap[group.items[0].tool_use_id] || 'web_search';
+              if (group.items[0].tool_use_id && group.items[0].tool_use_id.startsWith('srvtoolu_')) {
+                const idPart = group.items[0].tool_use_id.substring(9);
+                displayId = toolName + '-' + idPart.substring(0, 4).toUpperCase();
+              } else {
+                displayId = toolName;
+              }
+              mergedContent = group.items[0];
             } else {
+              const contentHash = simpleHash(getHashableContent(group.items[0]));
               displayId = contentHash.substring(0, 4).toUpperCase();
+              mergedContent = group.items[0];
             }
 
             blockDataStore[exampleId + '-' + blockId] = {
-              type: blockType,
-              content: contentItem,
+              type: renderBlockType,
+              content: mergedContent,
               displayId: displayId
             };
 
-            let blockHtml = '<div id=\"block-' + exampleId + '-' + blockId + '\" class=\"block ' + blockType + '\" onclick=\"showBlockDetail(\\\'' + exampleId + '\\\', \\\'' + blockId + '\\\')\">';
-            blockHtml += formatBlockType(blockType) + '/' + displayId;
+            let blockHtml = '<div id=\"block-' + exampleId + '-' + blockId + '\" class=\"block ' + renderBlockType + '\" onclick=\"showBlockDetail(\\\'' + exampleId + '\\\', \\\'' + blockId + '\\\')\">';
+            blockHtml += formatBlockType(renderBlockType) + '/' + displayId;
             blockHtml += '</div>';
 
             blocks.push({ html: blockHtml, isContinued: false });
