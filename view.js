@@ -686,13 +686,24 @@ function getCSS() {
         box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
         transition: max-height 0.3s ease, padding 0.3s ease;
         padding: 0;
+        margin: 0;
       }
 
       /* Drawer open state */
       .detail-panel.open {
         max-height: 80vh;
-        padding: 20px 15px;
+        padding: 20px 15px 0 15px;
         overflow: auto;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .detail-panel.open > * {
+        margin: 0;
+      }
+
+      .detail-panel.open > *:last-child {
+        padding-bottom: 15px;
       }
 
       /* Drag indicator (top handle bar) */
