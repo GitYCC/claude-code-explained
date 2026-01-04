@@ -758,11 +758,18 @@ function getCSS() {
 
       .blocks-container {
         gap: 4px;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
       }
 
       .block {
         padding: 6px 10px;
         font-size: 0.8em;
+        max-width: calc(100% - 4px);
+        min-width: 0;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
       }
     }
   `;
