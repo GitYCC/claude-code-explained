@@ -766,7 +766,7 @@ function getCSS() {
       .block {
         padding: 6px 10px;
         font-size: 0.8em;
-        max-width: calc(100% - 4px);
+        max-width: calc(33.33vw - 15px);
         min-width: 0;
         word-wrap: break-word;
         overflow-wrap: break-word;
